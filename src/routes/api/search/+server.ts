@@ -1,19 +1,17 @@
-import { error, json } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
-import { db } from '$lib/server/db';
-import { user as userTable } from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { error, json, redirect } from '@sveltejs/kit';
+import { spotifyFetch } from '$lib/server/spotify';
 
-export const GET: RequestHandler = async ({ url, locals }) => {
+export const POST = async ({ request, locals, fetch }) => {
 	const { user } = locals;
 	if (!user) {
-		throw error(401, 'Unauthorized');
+		throw redirect(303, '/');
 	}
 
-	const query = url.searchParams.get('q');
+	const formData = await request.formData();
+	const query = formData.get('query');
 
-	if (!query) {
-		return json({ tracks: { items: [] } });
+	if (!query || typeof query !== 'string' || query.length < 3) {
+		return json({ searchResults: [] });
 	}
 
 	const searchParams = new URLSearchParams({
@@ -22,11 +20,11 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		limit: '10'
 	});
 
-	const response = await fetch(`https://api.spotify.com/v1/search?${searchParams.toString()}`, {
-		headers: {
-			Authorization: `Bearer ${user.accessToken}`
-		}
-	});
+	const response = await spotifyFetch(
+		fetch,
+		`https://api.spotify.com/v1/search?${searchParams.toString()}`,
+		user
+	);
 
 	if (!response.ok) {
 		const errorJson = await response.json();
@@ -34,5 +32,5 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	}
 
 	const data = await response.json();
-	return json(data);
+	return json({ searchResults: data.tracks.items });
 };

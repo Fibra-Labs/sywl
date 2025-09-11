@@ -69,7 +69,7 @@ export const actions: Actions = {
 		const query = formData.get('query');
 
 		if (!query || typeof query !== 'string') {
-			return fail(400, { query, missing: true });
+			return { searchResults: [] };
 		}
 
 		const searchParams = new URLSearchParams({

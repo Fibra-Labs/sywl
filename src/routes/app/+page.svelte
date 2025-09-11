@@ -3,9 +3,8 @@
 	import SongCard from '$lib/components/SongCard.svelte';
 	import DislikeSearch from '$lib/components/DislikeSearch.svelte';
 	import { invalidateAll } from '$app/navigation';
-	import FilterInput from '$lib/components/FilterInput.svelte';
+	import LikeSearch from '$lib/components/LikeSearch.svelte';
 	import Reload from '$lib/components/Reload.svelte';
-	import ListSearch from '$lib/components/ListSearch.svelte';
 	import RecommendationCard from '$lib/components/RecommendationCard.svelte';
 
 	let { data, form } = $props<{ data: App.PageData; form: any }>();
@@ -111,7 +110,7 @@
 						</button>
 					</form>
 				</div>
-				<FilterInput bind:value={likedSongsSearch} placeholder="Search your liked songs..." class="mb-4" />
+				<LikeSearch onsongLiked={invalidateAll} />
 				<div class="divide-y divide-gray-700">
 					{#if filteredLikedSongs.length > 0}
 						{#each filteredLikedSongs as song (song.id)}
@@ -140,7 +139,7 @@
 				</div>
 			</div>
 
-			<!-- Column 2: Songs you don't like -->
+			<!-- Column 2: Songs you like/don't like -->
 			<div class="bg-gray-900/50 p-6 rounded-lg">
 				<h2 class="text-2xl font-bold mb-6">Songs You Don't Like</h2>
 				<DislikeSearch onsongDisliked={invalidateAll} />
@@ -172,30 +171,6 @@
 						{#if isRecommending} <Reload class="w-5 h-5 animate-spin" /> {/if} {isRecommending ? 'Finding...' : 'Find Songs You\'ll Love'}
 					</button>
 				</form>
-				<div class="my-4 flex items-center text-center">
-					<span class="flex-grow bg-gray-700 h-px"></span>
-					<span class="mx-4 text-sm text-gray-400">OR</span>
-					<span class="flex-grow bg-gray-700 h-px"></span>
-				</div>
-				<div>
-					<h3 class="text-lg font-semibold mb-2 text-left">Recommend from a song you like</h3>
-					<ListSearch
-						placeholder="Search your liked songs..."
-						searchFunction={(query) => {
-							return Promise.resolve(data.likedSongs.filter(s => s.name.toLowerCase().includes(query.toLowerCase()) || s.artist.toLowerCase().includes(query.toLowerCase())).slice(0, 5));
-						}}
-						onSelect={async (song) => {
-							const formData = new FormData();
-							formData.append('songId', song.id);
-							const result = await applyAction({
-								form: { action: '?/recommendFromSong', method: 'POST', request: { formData: () => formData } }
-							});
-							if (result.type === 'success' && result.data?.recommendedTracks) {
-								recommendedTracks = result.data.recommendedTracks;
-							}
-						}}
-					/>
-				</div>
 				<div class="mt-4 divide-y divide-gray-700">
 					{#each recommendedTracks as { track, explanation } (track.id)}
 						<RecommendationCard {track} {explanation} />

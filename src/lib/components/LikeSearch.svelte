@@ -2,12 +2,12 @@
 	import { enhance } from '$app/forms';
 	import Spinner from '$lib/components/Spinner.svelte';
 
-	let { onsongDisliked }: { onsongDisliked: () => void } = $props();
+	let { onsongLiked }: { onsongLiked: () => void } = $props();
 
 	let searchQuery = $state('');
 	let searchResults = $state<SpotifyApi.TrackObjectFull[]>([]);
 	let isSearching = $state(false);
-	let isDisliking = $state(false);
+	let isLiking = $state(false);
 
 	$effect(() => {
 		const q = searchQuery;
@@ -48,7 +48,7 @@
 <div class="relative">
 	<input
 		type="search"
-		placeholder="Search for a song to dislike..."
+		placeholder="Search for a song to like..."
 		class="w-full p-2 pl-8 border rounded bg-gray-800 border-gray-700 text-sm"
 		bind:value={searchQuery}
 	/>
@@ -70,35 +70,15 @@
 		<div class="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-md shadow-lg">
 			{#each searchResults as track (track.id)}
 				<div class="p-2 hover:bg-gray-700 flex items-center gap-4">
-					<img
-						src={track.album.images[0]?.url}
-						alt={track.album.name}
-						class="w-12 h-12 rounded-sm"
-					/>
+					<img src={track.album.images[0]?.url} alt={track.album.name} class="w-12 h-12 rounded-sm" />
 					<div class="flex-grow overflow-hidden">
 						<p class="font-bold truncate">{track.name}</p>
-						<p class="text-sm text-gray-400 truncate">
-							{track.artists.map((a) => a.name).join(', ')}
-						</p>
+						<p class="text-sm text-gray-400 truncate">{track.artists.map((a) => a.name).join(', ')}</p>
 					</div>
-					<form
-						method="POST"
-						action="?/dislikeSong"
-						use:enhance={() => {
-							isDisliking = true;
-							return async ({ result }) => {
-								if (result.type === 'success') {
-									onsongDisliked();
-									searchQuery = '';
-									searchResults = [];
-								}
-								isDisliking = false;
-							};
-						}}
-					>
+					<form method="POST" action="?/likeSong" use:enhance={() => { isLiking = true; return async ({ result }) => { if (result.type === 'success') { onsongLiked(); searchQuery = ''; searchResults = []; } isLiking = false; }; }}>
 						<input type="hidden" name="song" value={JSON.stringify(track)} />
 						<input type="hidden" name="reason" value="" />
-						<button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-sm disabled:opacity-50" disabled={isDisliking}>Dislike</button>
+						<button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm disabled:opacity-50" disabled={isLiking}>Like</button>
 					</form>
 				</div>
 			{/each}
