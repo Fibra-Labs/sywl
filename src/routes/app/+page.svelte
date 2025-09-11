@@ -6,6 +6,7 @@
 	import LikeSearch from '$lib/components/LikeSearch.svelte';
 	import Reload from '$lib/components/Reload.svelte';
 	import RecommendationCard from '$lib/components/RecommendationCard.svelte';
+	import RecommendationSearch from '$lib/components/RecommendationSearch.svelte';
 
 	let { data, form } = $props<{ data: App.PageData; form: any }>();
 
@@ -19,6 +20,8 @@
 	let dnaVisible = $state(false);
 	let soundProfile = $state(data.soundProfile);
 	let musicalDna = $state(data.musicalDna);
+	let recommendationMode = $state<'liked' | 'specific'>('liked');
+	let specificSongs = $state<SpotifyApi.TrackObjectFull[]>([]);
 
 	const filteredLikedSongs = $derived(
 		data.likedSongs.filter(
@@ -153,21 +156,60 @@
 			<!-- Column 3: Songs we recommend -->
 			<div class="bg-gray-900/50 p-6 rounded-lg">
 				<h2 class="text-2xl font-bold mb-6">Songs We Recommend</h2>
+
+				<div class="flex gap-2 mb-4">
+					<button
+						onclick={() => (recommendationMode = 'liked')}
+						class="flex-1 py-2 px-4 rounded text-sm font-semibold {recommendationMode === 'liked'
+							? 'bg-blue-600 text-white'
+							: 'bg-gray-700 hover:bg-gray-600 text-gray-300'}"
+					>
+						From My Liked Songs
+					</button>
+					<button
+						onclick={() => (recommendationMode = 'specific')}
+						class="flex-1 py-2 px-4 rounded text-sm font-semibold {recommendationMode === 'specific'
+							? 'bg-blue-600 text-white'
+							: 'bg-gray-700 hover:bg-gray-600 text-gray-300'}"
+					>
+						From specific song(s)
+					</button>
+				</div>
+
+				{#if recommendationMode === 'specific'}
+					<div class="mb-4">
+						<RecommendationSearch bind:selectedSongs={specificSongs} />
+						{#if specificSongs.length > 0}
+							<div class="mt-2 space-y-2">
+								{#each specificSongs as song (song.id)}
+									<div class="flex items-center gap-2 p-2 bg-gray-800 rounded">
+										<img src={song.album.images[0]?.url} alt={song.album.name} class="w-8 h-8 rounded-sm" />
+										<div class="flex-grow overflow-hidden">
+											<p class="text-sm truncate">{song.name}</p>
+											<p class="text-xs text-gray-400 truncate">{song.artists.map(a => a.name).join(', ')}</p>
+										</div>
+										<button onclick={() => specificSongs = specificSongs.filter(s => s.id !== song.id)} class="text-red-400 hover:text-red-300">&times;</button>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					</div>
+				{/if}
+
 				<form
 					class="text-center"
 					method="POST"
-					action="?/recommendSongs"
+					action={recommendationMode === 'liked' ? '?/recommendSongs' : '?/recommendFromSongs'}
 					use:enhance={() => {
 						isRecommending = true;
 						return async ({ result }) => {
-							if (result.type === 'success' && result.data?.recommendedTracks) {
-								recommendedTracks = result.data.recommendedTracks;
-							}
+							await applyAction(result);
 							isRecommending = false;
 						};
 					}}
 				>
-					<button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg disabled:opacity-50 w-full cursor-pointer flex items-center justify-center gap-2" disabled={isRecommending}>
+					{#if recommendationMode === 'specific'} <input type="hidden" name="songs" value={JSON.stringify(specificSongs)} /> {/if}
+					<button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg disabled:opacity-50 w-full cursor-pointer flex items-center justify-center gap-2" disabled={isRecommending || (recommendationMode === 'specific' && specificSongs.length === 0)}>
 						{#if isRecommending} <Reload class="w-5 h-5 animate-spin" /> {/if} {isRecommending ? 'Finding...' : 'Find Songs You\'ll Love'}
 					</button>
 				</form>

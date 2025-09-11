@@ -87,7 +87,7 @@ export const recommendSongs = async (
     likedSongs: ProfileSong[],
     dislikedSongs: ProfileSong[],
     musicalDna: string | null,
-    sourceSong?: ProfileSong
+    sourceSongs?: ProfileSong[]
 ) => {
     const model = genAI.getGenerativeModel({model: 'gemini-2.5-flash-lite'});
 
@@ -103,9 +103,10 @@ export const recommendSongs = async (
 
     const prompt = `Based on the user's taste, recommend 5 songs that are NOT in their liked songs list. For each song, provide the song title, artist, and a brief explanation for the recommendation, using " | " as a separator. Each recommendation must be on a new line.
 ${
-        sourceSong
+        sourceSongs && sourceSongs.length > 0
             ? `
-The recommendations should be based on this specific song the user likes: ${sourceSong.name} by ${sourceSong.artist}.
+The recommendations should be based on this specific list of songs the user likes:
+${sourceSongs.map(s => `- ${s.name} by ${s.artist}`).join('\n')}
 `
             : ''
     }
