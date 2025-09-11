@@ -9,7 +9,8 @@ export const user = sqliteTable('user', {
 	refreshToken: text('refresh_token').notNull(),
 	expiresAt: integer('expires_at').notNull(),
 	scope: text('scope').notNull(),
-	soundProfile: text('sound_profile')
+	soundProfile: text('sound_profile'),
+	musicalDna: text('musical_dna')
 });
 
 export const userRelations = relations(user, ({ many }) => ({

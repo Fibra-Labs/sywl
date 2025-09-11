@@ -1,105 +1,71 @@
 <script lang="ts">
-	import { applyAction, enhance } from '$app/forms';
-	import { createEventDispatcher } from 'svelte';
+	import { enhance, applyAction } from '$app/forms';
+	import Spinner from '$lib/components/Spinner.svelte';
+	import { debounce } from '$lib/utils';
 
-	let searchQuery = $state('');
+	let { onsongDisliked }: { onsongDisliked: () => void } = $props();
+
+	let query = $state('');
 	let searchResults = $state<SpotifyApi.TrackObjectFull[]>([]);
-	let hasFocus = $state(false);
-	let isLoading = $state(false);
+	let isSearching = $state(false);
+	let selectedSong = $state<SpotifyApi.TrackObjectFull | null>(null);
+	let reason = $state('');
+	let isDisliking = $state(false);
 
-	const debounce = (fn: (...args: any[]) => void, delay: number) => {
-		const dispatch = createEventDispatcher();
-
-		let timeoutId: number;
-		return (...args: any[]) => {
-			clearTimeout(timeoutId);
-			timeoutId = window.setTimeout(() => fn(...args), delay);
-		};
-	};
-
-	const dispatch = createEventDispatcher();
-
-	const search = async () => {
-		if (searchQuery.trim().length < 2) {
+	const search = debounce(async (q: string) => {
+		if (q.length < 3) {
 			searchResults = [];
-			isLoading = false;
 			return;
 		}
-		isLoading = true;
-
+		isSearching = true;
 		const formData = new FormData();
-		formData.append('query', searchQuery);
-		const response = await fetch('?/search', {
-			method: 'POST',
-			body: formData
+		formData.append('query', q);
+		const result = await applyAction({
+			form: { action: '?/search', method: 'POST', request: { formData: () => formData } }
 		});
-		const result = await applyAction(await response.json());
-		if (result.data?.searchResults) {
+		if (result.type === 'success' && result.data?.searchResults) {
 			searchResults = result.data.searchResults;
-		} else {
-			searchResults = [];
 		}
-		isLoading = false;
-	};
+		isSearching = false;
+	}, 300);
 
-	const debouncedSearch = debounce(search, 300);
+	$effect(() => {
+		search(query);
+	});
 </script>
 
 <div class="relative">
 	<input
 		type="search"
-		bind:value={searchQuery}
-		name="query"
-		placeholder="Search to dislike a song..."
-		oninput={debouncedSearch}
-		onfocus={() => (hasFocus = true)}
-		onblur={() => setTimeout(() => (hasFocus = false), 150)}
-		class="w-full bg-gray-800 border-gray-700 rounded-md text-sm p-2 focus:ring-green-500 focus:border-green-500"
+		bind:value={query}
+		placeholder="Search for a song to dislike..."
+		class="w-full p-2 pl-8 border rounded bg-gray-800 border-gray-700 text-sm"
 	/>
-
-	{#if hasFocus && (searchResults.length > 0 || isLoading)}
-		<div class="absolute z-10 w-full bg-gray-800 rounded-md shadow-lg max-h-80 overflow-y-auto">
-			<div class="p-2 space-y-2">
-				{#if isLoading}
-					<div class="p-4 text-center text-gray-400">Searching...</div>
-				{:else}
-					{#each searchResults as track (track.id)}
-						<div class="flex items-center gap-3 p-2 rounded-md hover:bg-gray-700">
-							{#if track.album.images.length > 0}
-								<img
-									src={track.album.images[0].url}
-									alt={`Album art for ${track.album.name}`}
-									class="w-10 h-10 rounded"
-								/>
-							{/if}
-							<div class="flex-grow">
-								<p class="font-bold text-sm">{track.name}</p>
-								<p class="text-xs text-gray-400">
-									{track.artists.map((a) => a.name).join(', ')}
-								</p>
-							</div>
-							<form
-								method="POST"
-								action="?/dislikeSong"
-								use:enhance={() => {
-									return async ({ result }) => {
-										if (result.type === 'success') {
-											dispatch('songDisliked');
-											searchQuery = '';
-											searchResults = [];
-										}
-									};
-								}}
-							>
-								<input type="hidden" name="song" value={JSON.stringify(track)} />
-								<button type="submit" class="text-sm text-red-400 hover:text-red-300 cursor-pointer">
-									Dislike
-								</button>
-							</form>
-						</div>
-					{/each}
-				{/if}
-			</div>
+	<div class="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+		<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+			><path
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				stroke-width="2"
+				d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path
+		></svg>
+	</div>
+	{#if searchResults.length > 0}
+		<div class="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-md shadow-lg">
+			{#each searchResults as track (track.id)}
+				<button type="button" class="w-full text-left p-2 hover:bg-gray-700" on:click={() => { selectedSong = track; searchResults = []; query = track.name; isSearching = false; }}>
+					<p class="font-bold truncate">{track.name}</p>
+					<p class="text-sm text-gray-400 truncate">{track.artists.map((a) => a.name).join(', ')}</p>
+				</button>
+			{/each}
 		</div>
 	{/if}
 </div>
+
+{#if selectedSong}
+	<form method="POST" action="?/dislikeSong" use:enhance={() => { isDisliking = true; return async ({ result }) => { if (result.type === 'success') { onsongDisliked(); selectedSong = null; query = ''; } isDisliking = false; }; }}>
+		<input type="hidden" name="song" value={JSON.stringify(selectedSong)} />
+		<input type="hidden" name="reason" value="" />
+		<button type="submit" class="mt-2 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50" disabled={isDisliking}>Dislike "{selectedSong.name}"</button>
+	</form>
+{/if}

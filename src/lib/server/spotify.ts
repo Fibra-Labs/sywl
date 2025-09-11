@@ -76,7 +76,8 @@ const refreshAccessToken = async (refreshToken: string) => {
 export const spotifyFetch = async (
 	fetcher: typeof fetch,
 	url: string,
-	user: App.User
+	user: App.User,
+	options: RequestInit = {}
 ): Promise<Response> => {
 	let { accessToken, expiresAt, refreshToken } = user;
 
@@ -85,7 +86,9 @@ export const spotifyFetch = async (
 	}
 
 	const response = await fetcher(url, {
+		...options,
 		headers: {
+			...options.headers,
 			Authorization: `Bearer ${accessToken}`
 		}
 	});

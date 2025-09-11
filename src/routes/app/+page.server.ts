@@ -27,6 +27,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 		}),
 		db.query.userSongDislike.findMany({
 			where: eq(userSongDislike.userId, user.id),
+			orderBy: [desc(userSongDislike.createdAt)],
 			with: {
 				song: true
 			}
@@ -52,7 +53,8 @@ export const load: PageServerLoad = async ({ parent }) => {
 	return {
 		likedSongs,
 		dislikedSongs,
-		soundProfile: user.soundProfile
+		soundProfile: user.soundProfile,
+		musicalDna: user.musicalDna
 	};
 };
 
@@ -100,9 +102,50 @@ export const actions: Actions = {
 
 		const formData = await request.formData();
 		const songData = formData.get('song');
+		const reason = formData.get('reason');
 
-		if (!songData || typeof songData !== 'string') {
-			return fail(400, { message: 'Invalid song data' });
+		if (!songData || typeof songData !== 'string' || typeof reason !== 'string') {
+			return fail(400, { message: 'Invalid input' });
+		}
+
+		const song: SpotifyApi.TrackObjectFull = JSON.parse(songData);
+
+		await db
+			.insert(songTable)
+			.values({
+				id: song.id,
+				name: song.name,
+				artist: song.artists?.map((a) => a.name).join(', ') ?? 'Unknown Artist',
+				album: song.album?.name ?? 'Single',
+				imageUrl: song.album?.images?.[0]?.url ?? null
+			})
+			.onConflictDoNothing();
+
+		await db
+			.insert(userSongDislike)
+			.values({
+				userId: user.id,
+				songId: song.id,
+				reason,
+				createdAt: new Date()
+			})
+			.onConflictDoNothing();
+
+		return { success: true };
+	},
+
+	likeSong: async ({ request, locals, fetch }) => {
+		const { user } = locals;
+		if (!user) {
+			throw redirect(303, '/');
+		}
+
+		const formData = await request.formData();
+		const songData = formData.get('song');
+		const reason = formData.get('reason');
+
+		if (!songData || typeof songData !== 'string' || typeof reason !== 'string') {
+			return fail(400, { message: 'Invalid input' });
 		}
 
 		const song: SpotifyApi.TrackObjectFull = JSON.parse(songData);
@@ -113,21 +156,23 @@ export const actions: Actions = {
 				id: song.id,
 				name: song.name,
 				artist: song.artists.map((a) => a.name).join(', '),
-				album: song.album.name,
-				imageUrl: song.album.images.length > 0 ? song.album.images[0].url : null
+				album: song.album?.name ?? 'Single',
+				imageUrl: song.album?.images?.[0]?.url ?? null
 			})
 			.onConflictDoNothing();
 
-		await db
-			.insert(userSongDislike)
-			.values({
-				userId: user.id,
-				songId: song.id,
-				createdAt: new Date()
-			})
-			.onConflictDoNothing();
+		await spotifyFetch(
+			fetch,
+			`https://api.spotify.com/v1/me/tracks?ids=${song.id}`,
+			user,
+			{
+				method: 'PUT'
+			}
+		);
 
-		return { success: true };
+		await db.insert(userSongLike).values({ userId: user.id, songId: song.id, reason, createdAt: new Date() }).onConflictDoNothing();
+
+		return { success: true, likedSongId: song.id };
 	},
 
 	saveLikeReason: async ({ request, locals }) => {
@@ -233,5 +278,145 @@ export const actions: Actions = {
 		}
 
 		return { success: true };
+	},
+
+	recommendSongs: async ({ locals, fetch }) => {
+		const { user } = locals;
+		if (!user) {
+			throw redirect(303, '/');
+		}
+
+		const [likedSongs, dislikedSongs] = await Promise.all([
+			db.query.userSongLike.findMany({
+				where: eq(userSongLike.userId, user.id),
+				with: { song: true }
+			}),
+			db.query.userSongDislike.findMany({
+				where: eq(userSongDislike.userId, user.id),
+				with: { song: true }
+			})
+		]);
+
+		const profileSongs = (songs: (typeof likedSongs | typeof dislikedSongs)) =>
+			songs
+				.filter((s): s is typeof s & { song: DbSong } => s.song !== null)
+				.map((s) => ({ name: s.song.name, artist: s.song.artist, reason: s.reason }));
+
+		const { recommendSongs } = await import('$lib/server/google');
+		const recommendations = await recommendSongs(
+			profileSongs(likedSongs),
+			profileSongs(dislikedSongs),
+			user.musicalDna,
+			undefined
+		);
+
+		const searchPromises = recommendations.map(([song, artist]) => {
+			const query = `track:"${song}" artist:"${artist}"`;
+
+			const searchParams = new URLSearchParams({
+				q: query,
+				type: 'track',
+				limit: '1'
+			});
+			return spotifyFetch(fetch, `https://api.spotify.com/v1/search?${searchParams}`, user);
+		});
+
+		const searchResults = await Promise.all(searchPromises);
+		const searchJson = await Promise.all(searchResults.map((res) => res.json()));
+
+		const recommendedTracks = searchJson
+			.map((j, i) => {
+				const track = j.tracks?.items[0];
+				if (track) {
+					return { track, explanation: recommendations[i][2] };
+				}
+				// Create a placeholder track if not found on Spotify
+				return {
+					track: {
+						id: `ai-rec-${i}-${Date.now()}`, // Unique ID for Svelte key
+						name: recommendations[i][0],
+						artists: [{ name: recommendations[i][1] } as SpotifyApi.ArtistObjectSimplified],
+						album: { images: [] },
+						external_urls: { spotify: '' }
+					},
+					explanation: 'This song is not available on Spotify.'
+				};
+			});
+
+		return { recommendedTracks };
+	},
+
+	recommendFromSong: async ({ request, locals, fetch }) => {
+		const { user } = locals;
+		if (!user) {
+			throw redirect(303, '/');
+		}
+
+		const formData = await request.formData();
+		const songId = formData.get('songId');
+
+		if (!songId || typeof songId !== 'string') {
+			return fail(400, { message: 'Invalid song ID' });
+		}
+
+		const [likedSongs, dislikedSongs, sourceSongLike] = await Promise.all([
+			db.query.userSongLike.findMany({
+				where: eq(userSongLike.userId, user.id),
+				with: { song: true }
+			}),
+			db.query.userSongDislike.findMany({
+				where: eq(userSongDislike.userId, user.id),
+				with: { song: true }
+			}),
+			db.query.userSongLike.findFirst({
+				where: and(eq(userSongLike.userId, user.id), eq(userSongLike.songId, songId)),
+				with: { song: true }
+			})
+		]);
+
+		if (!sourceSongLike?.song) {
+			return fail(404, { message: 'Source song not found in your liked songs.' });
+		}
+
+		const profileSongs = (songs: (typeof likedSongs | typeof dislikedSongs)) =>
+			songs
+				.filter((s): s is typeof s & { song: DbSong } => s.song !== null)
+				.map((s) => ({ name: s.song.name, artist: s.song.artist, reason: s.reason }));
+
+		const { recommendSongs } = await import('$lib/server/google');
+		const recommendations = await recommendSongs(
+			profileSongs(likedSongs),
+			profileSongs(dislikedSongs),
+			user.musicalDna,
+			{ name: sourceSongLike.song.name, artist: sourceSongLike.song.artist, reason: sourceSongLike.reason }
+		);
+
+		const searchPromises = recommendations.map(([song, artist]) => {
+			const query = `track:"${song}" artist:"${artist}"`;
+			const searchParams = new URLSearchParams({ q: query, type: 'track', limit: '1' });
+			return spotifyFetch(fetch, `https://api.spotify.com/v1/search?${searchParams}`, user);
+		});
+
+		const searchResults = await Promise.all(searchPromises);
+		const searchJson = await Promise.all(searchResults.map((res) => res.json()));
+
+		const recommendedTracks = searchJson.map((j, i) => {
+			const track = j.tracks?.items[0];
+			if (track) {
+				return { track, explanation: recommendations[i][2] };
+			}
+			return {
+				track: {
+					id: `ai-rec-${i}-${Date.now()}`,
+					name: recommendations[i][0],
+					artists: [{ name: recommendations[i][1] } as SpotifyApi.ArtistObjectSimplified],
+					album: { images: [] },
+					external_urls: { spotify: '' }
+				},
+				explanation: 'This song is not available on Spotify.'
+			};
+		});
+
+		return { recommendedTracks };
 	}
 };
