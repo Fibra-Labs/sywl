@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 
 const SPOTIFY_CLIENT_ID = env.SPOTIFY_CLIENT_ID;
 const SPOTIFY_CLIENT_SECRET = env.SPOTIFY_CLIENT_SECRET;
-const SPOTIFY_REDIRECT_URI = 'https://127.0.0.1:5173/login/spotify/callback';
+const SPOTIFY_REDIRECT_URI = env.SPOTIFY_REDIRECT_URI;
 
 export interface Song {
 	id: string;
@@ -43,6 +43,7 @@ export const spotifyLogin = (event: RequestEvent) => {
 };
 
 const refreshAccessToken = async (refreshToken: string) => {
+    console.log('Refreshing token');
 	const response = await fetch('https://accounts.spotify.com/api/token', {
 		method: 'POST',
 		headers: {
@@ -58,6 +59,7 @@ const refreshAccessToken = async (refreshToken: string) => {
 	const tokens = await response.json();
 
 	if (!response.ok) {
+        console.log('There was an error refreshing the token');
 		throw new Error(tokens.error_description);
 	}
 
@@ -79,6 +81,7 @@ export const spotifyFetch = async (
 	user: App.User,
 	options: RequestInit = {}
 ): Promise<Response> => {
+    console.log('Fetching from spotify');
 	let { accessToken, expiresAt, refreshToken } = user;
 
 	if (Date.now() > expiresAt) {
@@ -100,6 +103,7 @@ export const getMySavedTracks = async (
 	fetcher: typeof fetch,
 	user: App.User
 ): Promise<Song[]> => {
+    console.log('Getting saved tracks');
 	const response = await spotifyFetch(fetcher, 'https://api.spotify.com/v1/me/tracks?limit=50', user);
 	if (!response.ok) {
 		return [];

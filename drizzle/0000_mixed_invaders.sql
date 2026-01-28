@@ -22,7 +22,7 @@ CREATE TABLE `user_song_dislike` (
 	`user_id` text NOT NULL,
 	`song_id` text NOT NULL,
 	`reason` text,
-	`created_at` integer DEFAULT '"2026-01-28T15:57:55.893Z"' NOT NULL,
+	`created_at` integer DEFAULT '"2026-01-28T19:02:13.059Z"' NOT NULL,
 	PRIMARY KEY(`song_id`, `user_id`),
 	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`song_id`) REFERENCES `song`(`id`) ON UPDATE no action ON DELETE cascade
@@ -32,7 +32,7 @@ CREATE TABLE `user_song_like` (
 	`user_id` text NOT NULL,
 	`song_id` text NOT NULL,
 	`reason` text,
-	`created_at` integer DEFAULT '"2026-01-28T15:57:55.893Z"' NOT NULL,
+	`created_at` integer DEFAULT '"2026-01-28T19:02:13.059Z"' NOT NULL,
 	PRIMARY KEY(`song_id`, `user_id`),
 	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`song_id`) REFERENCES `song`(`id`) ON UPDATE no action ON DELETE cascade

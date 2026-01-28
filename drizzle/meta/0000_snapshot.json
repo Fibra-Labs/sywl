@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "9d080511-e22a-422a-ab85-bee77883e3de",
+  "id": "12eaaa29-17b7-45e0-a3d9-fd79f32c6d13",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "song": {
@@ -158,7 +158,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'\"2026-01-28T15:57:55.893Z\"'"
+          "default": "'\"2026-01-28T19:02:13.059Z\"'"
         }
       },
       "indexes": {},
@@ -231,7 +231,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'\"2026-01-28T15:57:55.893Z\"'"
+          "default": "'\"2026-01-28T19:02:13.059Z\"'"
         }
       },
       "indexes": {},

@@ -9,6 +9,7 @@ declare global {
 		// interface PageData {}
 		// interface PageState {}
 		// interface Platform {}
+		interface User extends ReturnType<typeof user.$inferSelect> {}
 	}
 }
 
