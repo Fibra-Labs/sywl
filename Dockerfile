@@ -10,13 +10,17 @@ RUN rm -f package-lock.json && npm install
 # Copy everything
 COPY . .
 
+# migrate db
+RUN npm run db:migrate
+
 # Build
 RUN npm run build
 
 # Remove dev dependencies
+RUN npm prune --omit=dev
 
 # Expose port
 EXPOSE 3000
 
 # Run
-CMD ["sh", "-c", "npm run db:migrate && node build"]
+CMD ["node", "build"]
