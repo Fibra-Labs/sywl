@@ -105,8 +105,11 @@ export const recommendSongs = async (
 ${
         sourceSongs && sourceSongs.length > 0
             ? `
-The recommendations should be based on this specific list of songs the user likes:
+Recommendations should be hyper-relevantly based on this specific list of songs the user likes. and the explanation should let the user know how recommendations relate to this list of songs:
+
+<HYPER_RELEVANT_SONGS>
 ${sourceSongs.map(s => `- ${s.name} by ${s.artist}`).join('\n')}
+</HYPER_RELEVANT_SONGS>
 `
             : ''
     }
@@ -114,7 +117,7 @@ Example:
 Bohemian Rhapsody | Queen | This song matches your taste for dramatic, multi-part rock epics.
 Like a Rolling Stone | Bob Dylan | The raw, narrative vocal style aligns with your preference for authentic storytelling.
 
-This is the user's musical DNA, use it as the primary source of truth for their taste:
+This is the user's musical DNA, use it as a secondary source of truth for their taste:
 ${musicalDna ?? 'No DNA generated yet.'}
 
 <LIKED_SONGS>
@@ -124,6 +127,8 @@ ${likedText}
 <DISLIKED_SONGS>
 ${dislikedText}
 </DISLIKED_SONGS>
+
+${sourceSongs && sourceSongs.length > 0 ? `For each recommendation, explain how it relates to the list of HYPER RELEVANT SONGS that were provided.` : ''}
 `;
 
     console.log(prompt);

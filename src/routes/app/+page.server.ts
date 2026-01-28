@@ -359,11 +359,7 @@ export const actions: Actions = {
         }
         const sourceSongs: SpotifyApi.TrackObjectFull[] = JSON.parse(songsData);
 
-        const [likedSongs, dislikedSongs] = await Promise.all([
-            db.query.userSongLike.findMany({
-                where: eq(userSongLike.userId, user.id),
-                with: {song: true}
-            }),
+        const [dislikedSongs] = await Promise.all([
             db.query.userSongDislike.findMany({
                 where: eq(userSongDislike.userId, user.id),
                 with: {song: true}
@@ -374,7 +370,7 @@ export const actions: Actions = {
             return fail(400, {message: 'No source songs provided.'});
         }
 
-        const profileSongs = (songs: (typeof likedSongs | typeof dislikedSongs)) =>
+        const profileSongs = (songs: (typeof dislikedSongs)) =>
             songs
                 .filter((s): s is typeof s & { song: DbSong } => s.song !== null)
                 .map((s) => ({name: s.song.name, artist: s.song.artist, reason: s.reason}));
@@ -387,9 +383,9 @@ export const actions: Actions = {
 
         const {recommendSongs} = await import('$lib/server/google');
         const recommendations = await recommendSongs(
-            profileSongs(likedSongs),
+            [],
             profileSongs(dislikedSongs),
-            user.musicalDna,
+            user.soundProfile,
             sourceSongsForPrompt
         );
 
