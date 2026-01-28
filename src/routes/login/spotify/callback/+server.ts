@@ -7,7 +7,7 @@ import type { RequestHandler } from './$types';
 
 const SPOTIFY_CLIENT_ID = env.SPOTIFY_CLIENT_ID;
 const SPOTIFY_CLIENT_SECRET = env.SPOTIFY_CLIENT_SECRET;
-const SPOTIFY_REDIRECT_URI = 'https://127.0.0.1:5173/login/spotify/callback';
+const SPOTIFY_REDIRECT_URI = env.SPOTIFY_REDIRECT_URI;
 
 export const GET: RequestHandler = async ({ url, cookies }) => {
     const code = url.searchParams.get('code');
