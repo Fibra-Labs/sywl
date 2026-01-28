@@ -21,6 +21,12 @@
 	let soundProfile = $state(data.soundProfile);
 	let musicalDna = $state(data.musicalDna);
 	let recommendationMode = $state<'liked' | 'specific'>('specific');
+
+	// Sync local state when data prop changes
+	$effect(() => {
+		soundProfile = data.soundProfile;
+		musicalDna = data.musicalDna;
+	});
 	let specificSongs = $state<SpotifyApi.TrackObjectFull[]>([]);
 
 	const filteredLikedSongs = $derived(
