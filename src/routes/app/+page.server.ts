@@ -390,75 +390,90 @@ export const actions: Actions = {
     },
 
     recommendFromSongs: async ({request, locals, fetch}) => {
+        console.log('[APP PAGE ACTION] recommendFromSongs started');
         const {user} = locals;
         if (!user) {
+            console.log('[APP PAGE ACTION] recommendFromSongs: no user');
             throw redirect(303, '/');
         }
 
-        const formData = await request.formData();
-        const songsData = formData.get('songs');
+        try {
+            const formData = await request.formData();
+            const songsData = formData.get('songs');
 
-        if (!songsData || typeof songsData !== 'string') {
-            return fail(400, {message: 'Invalid input'});
-        }
-        const sourceSongs: SpotifyApi.TrackObjectFull[] = JSON.parse(songsData);
-
-        const [dislikedSongs] = await Promise.all([
-            db.query.userSongDislike.findMany({
-                where: eq(userSongDislike.userId, user.id),
-                with: {song: true}
-            })
-        ]);
-
-        if (sourceSongs.length === 0) {
-            return fail(400, {message: 'No source songs provided.'});
-        }
-
-        const profileSongs = (songs: (typeof dislikedSongs)) =>
-            songs
-                .filter((s): s is typeof s & { song: DbSong } => s.song !== null)
-                .map((s) => ({name: s.song.name, artist: s.song.artist, reason: s.reason}));
-
-        const sourceSongsForPrompt = sourceSongs.map(s => ({
-            name: s.name,
-            artist: s.artists.map(a => a.name).join(', '),
-            reason: ''
-        }));
-
-        const {recommendSongs} = await import('$lib/server/groq');
-        const recommendations = await recommendSongs(
-            [],
-            profileSongs(dislikedSongs),
-            user.soundProfile,
-            sourceSongsForPrompt
-        );
-
-        const searchPromises = recommendations.map(([song, artist]) => {
-            const query = `track:"${song}" artist:"${artist}"`;
-            const searchParams = new URLSearchParams({q: query, type: 'track', limit: '1'});
-            return spotifyFetch(fetch, `https://api.spotify.com/v1/search?${searchParams}`, user);
-        });
-
-        const searchResults = await Promise.all(searchPromises);
-        const searchJson = await Promise.all(searchResults.map((res) => res.json()));
-
-        const recommendedTracks = searchJson.map((j, i) => {
-            const track = j.tracks?.items[0];
-            if (track) {
-                return {track, explanation: recommendations[i][2]};
+            if (!songsData || typeof songsData !== 'string') {
+                console.log('[APP PAGE ACTION] recommendFromSongs: invalid input');
+                return fail(400, {message: 'Invalid input'});
             }
-            return {
-                track: {
-                    id: `ai-rec-${i}-${Date.now()}`,
-                    name: recommendations[i][0],
-                    artists: [{name: recommendations[i][1]} as SpotifyApi.ArtistObjectSimplified],
-                    album: {images: []},
-                    external_urls: {spotify: ''}
-                },
-                explanation: 'This song is not available on Spotify.'
-            };
-        });
+            const sourceSongs: SpotifyApi.TrackObjectFull[] = JSON.parse(songsData);
+            console.log('[APP PAGE ACTION] recommendFromSongs: source songs:', sourceSongs.map(s => `${s.name} - ${s.artists[0]?.name}`));
 
-        return {recommendedTracks};
+            const [dislikedSongs] = await Promise.all([
+                db.query.userSongDislike.findMany({
+                    where: eq(userSongDislike.userId, user.id),
+                    with: {song: true}
+                })
+            ]);
+
+            if (sourceSongs.length === 0) {
+                console.log('[APP PAGE ACTION] recommendFromSongs: no source songs');
+                return fail(400, {message: 'No source songs provided.'});
+            }
+
+            const profileSongs = (songs: (typeof dislikedSongs)) =>
+                songs
+                    .filter((s): s is typeof s & { song: DbSong } => s.song !== null)
+                    .map((s) => ({name: s.song.name, artist: s.song.artist, reason: s.reason}));
+
+            const sourceSongsForPrompt = sourceSongs.map(s => ({
+                name: s.name,
+                artist: s.artists.map(a => a.name).join(', '),
+                reason: ''
+            }));
+
+            console.log('[APP PAGE ACTION] recommendFromSongs: calling AI');
+            const {recommendSongs} = await import('$lib/server/groq');
+            const recommendations = await recommendSongs(
+                [],
+                profileSongs(dislikedSongs),
+                user.soundProfile,
+                sourceSongsForPrompt
+            );
+
+            console.log('[APP PAGE ACTION] recommendFromSongs: got', recommendations.length, 'recommendations');
+            console.log('[APP PAGE ACTION] recommendFromSongs: recommendations:', recommendations.map(r => `${r[0]} - ${r[1]}`));
+
+            const searchPromises = recommendations.map(([song, artist]) => {
+                const query = `track:"${song}" artist:"${artist}"`;
+                const searchParams = new URLSearchParams({q: query, type: 'track', limit: '1'});
+                return spotifyFetch(fetch, `https://api.spotify.com/v1/search?${searchParams}`, user);
+            });
+
+            const searchResults = await Promise.all(searchPromises);
+            const searchJson = await Promise.all(searchResults.map((res) => res.json()));
+
+            const recommendedTracks = searchJson.map((j, i) => {
+                const track = j.tracks?.items[0];
+                if (track) {
+                    return {track, explanation: recommendations[i][2]};
+                }
+                return {
+                    track: {
+                        id: `ai-rec-${i}-${Date.now()}`,
+                        name: recommendations[i][0],
+                        artists: [{name: recommendations[i][1]} as SpotifyApi.ArtistObjectSimplified],
+                        album: {images: []},
+                        external_urls: {spotify: ''}
+                    },
+                    explanation: 'This song is not available on Spotify.'
+                };
+            });
+
+            console.log('[APP PAGE ACTION] recommendFromSongs: success');
+            return {recommendedTracks};
+        } catch (e) {
+            console.error('[APP PAGE ACTION] recommendFromSongs error:', e);
+            throw e;
+        }
     }
 };
