@@ -13,13 +13,10 @@ COPY . .
 # Build
 RUN npm run build
 
-RUN npm run db:migrate
-
 # Remove dev dependencies
-RUN npm prune --omit=dev
 
 # Expose port
 EXPOSE 3000
 
 # Run
-CMD ["node", "build"]
+CMD ["sh", "-c", "npm run db:migrate && node build"]
