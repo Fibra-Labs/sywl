@@ -6,50 +6,61 @@ import {and, desc, eq} from 'drizzle-orm';
 import {getMySavedTracks, spotifyFetch} from '$lib/server/spotify';
 
 export const load: PageServerLoad = async ({parent}) => {
+    console.log('[APP PAGE] Loading app page');
     const {user} = await parent();
     if (!user) {
+        console.log('[APP PAGE] No user, redirecting');
         throw redirect(303, '/');
     }
 
-    const [likedSongsFromDb, dislikedSongsFromDb] = await Promise.all([
-        db.query.userSongLike.findMany({
-            where: eq(userSongLike.userId, user.id),
-            orderBy: [desc(userSongLike.createdAt)],
-            with: {
-                song: true
-            }
-        }),
-        db.query.userSongDislike.findMany({
-            where: eq(userSongDislike.userId, user.id),
-            orderBy: [desc(userSongDislike.createdAt)],
-            with: {
-                song: true
-            }
-        })
-    ]);
+    console.log('[APP PAGE] User ID:', user.id);
 
-    const likedSongs = likedSongsFromDb
-        .filter((like): like is typeof like & { song: DbSong } => like.song !== null)
-        .map((like) => ({
-            ...like.song,
-            reason: like.reason,
-            createdAt: like.createdAt
-        }));
+    try {
+        const [likedSongsFromDb, dislikedSongsFromDb] = await Promise.all([
+            db.query.userSongLike.findMany({
+                where: eq(userSongLike.userId, user.id),
+                orderBy: [desc(userSongLike.createdAt)],
+                with: {
+                    song: true
+                }
+            }),
+            db.query.userSongDislike.findMany({
+                where: eq(userSongDislike.userId, user.id),
+                orderBy: [desc(userSongDislike.createdAt)],
+                with: {
+                    song: true
+                }
+            })
+        ]);
 
-    const dislikedSongs = dislikedSongsFromDb
-        .filter((dislike): dislike is typeof dislike & { song: DbSong } => dislike.song !== null)
-        .map((dislike) => ({
-            ...dislike.song,
-            reason: dislike.reason,
-            createdAt: dislike.createdAt
-        }));
+        const likedSongs = likedSongsFromDb
+            .filter((like): like is typeof like & { song: DbSong } => like.song !== null)
+            .map((like) => ({
+                ...like.song,
+                reason: like.reason,
+                createdAt: like.createdAt
+            }));
 
-    return {
-        likedSongs,
-        dislikedSongs,
-        soundProfile: user.soundProfile,
-        musicalDna: user.musicalDna
-    };
+        const dislikedSongs = dislikedSongsFromDb
+            .filter((dislike): dislike is typeof dislike & { song: DbSong } => dislike.song !== null)
+            .map((dislike) => ({
+                ...dislike.song,
+                reason: dislike.reason,
+                createdAt: dislike.createdAt
+            }));
+
+        console.log('[APP PAGE] Loaded', likedSongs.length, 'likes,', dislikedSongs.length, 'dislikes');
+
+        return {
+            likedSongs,
+            dislikedSongs,
+            soundProfile: user.soundProfile,
+            musicalDna: user.musicalDna
+        };
+    } catch (e) {
+        console.error('[APP PAGE] Error loading data:', e);
+        throw e;
+    }
 };
 
 export const actions: Actions = {
@@ -129,49 +140,59 @@ export const actions: Actions = {
     },
 
     likeSong: async ({request, locals, fetch}) => {
+        console.log('[APP PAGE ACTION] likeSong started');
         const {user} = locals;
         if (!user) {
+            console.log('[APP PAGE ACTION] likeSong: no user');
             throw redirect(303, '/');
         }
 
-        const formData = await request.formData();
-        const songData = formData.get('song');
-        const reason = formData.get('reason');
+        try {
+            const formData = await request.formData();
+            const songData = formData.get('song');
+            const reason = formData.get('reason');
 
-        if (!songData || typeof songData !== 'string' || typeof reason !== 'string') {
-            return fail(400, {message: 'Invalid input'});
-        }
-
-        const song: SpotifyApi.TrackObjectFull = JSON.parse(songData);
-
-        await db
-            .insert(songTable)
-            .values({
-                id: song.id,
-                name: song.name,
-                artist: song.artists.map((a) => a.name).join(', '),
-                album: song.album?.name ?? 'Single',
-                imageUrl: song.album?.images?.[0]?.url ?? null
-            })
-            .onConflictDoNothing();
-
-        await spotifyFetch(
-            fetch,
-            `https://api.spotify.com/v1/me/tracks?ids=${song.id}`,
-            user,
-            {
-                method: 'PUT'
+            if (!songData || typeof songData !== 'string' || typeof reason !== 'string') {
+                console.log('[APP PAGE ACTION] likeSong: invalid input');
+                return fail(400, {message: 'Invalid input'});
             }
-        );
 
-        await db.insert(userSongLike).values({
-            userId: user.id,
-            songId: song.id,
-            reason,
-            createdAt: new Date()
-        }).onConflictDoNothing();
+            const song: SpotifyApi.TrackObjectFull = JSON.parse(songData);
+            console.log('[APP PAGE ACTION] likeSong:', song.id);
 
-        return {success: true, likedSongId: song.id};
+            await db
+                .insert(songTable)
+                .values({
+                    id: song.id,
+                    name: song.name,
+                    artist: song.artists.map((a) => a.name).join(', '),
+                    album: song.album?.name ?? 'Single',
+                    imageUrl: song.album?.images?.[0]?.url ?? null
+                })
+                .onConflictDoNothing();
+
+            await spotifyFetch(
+                fetch,
+                `https://api.spotify.com/v1/me/tracks?ids=${song.id}`,
+                user,
+                {
+                    method: 'PUT'
+                }
+            );
+
+            await db.insert(userSongLike).values({
+                userId: user.id,
+                songId: song.id,
+                reason,
+                createdAt: new Date()
+            }).onConflictDoNothing();
+
+            console.log('[APP PAGE ACTION] likeSong: success');
+            return {success: true, likedSongId: song.id};
+        } catch (e) {
+            console.error('[APP PAGE ACTION] likeSong error:', e);
+            throw e;
+        }
     },
 
     saveLikeReason: async ({request, locals}) => {
@@ -290,69 +311,82 @@ export const actions: Actions = {
     },
 
     recommendSongs: async ({locals, fetch}) => {
+        console.log('[APP PAGE ACTION] recommendSongs started');
         const {user} = locals;
         if (!user) {
+            console.log('[APP PAGE ACTION] recommendSongs: no user');
             throw redirect(303, '/');
         }
 
-        const [likedSongs, dislikedSongs] = await Promise.all([
-            db.query.userSongLike.findMany({
-                where: eq(userSongLike.userId, user.id),
-                with: {song: true}
-            }),
-            db.query.userSongDislike.findMany({
-                where: eq(userSongDislike.userId, user.id),
-                with: {song: true}
-            })
-        ]);
+        try {
+            const [likedSongs, dislikedSongs] = await Promise.all([
+                db.query.userSongLike.findMany({
+                    where: eq(userSongLike.userId, user.id),
+                    with: {song: true}
+                }),
+                db.query.userSongDislike.findMany({
+                    where: eq(userSongDislike.userId, user.id),
+                    with: {song: true}
+                })
+            ]);
 
-        const profileSongs = (songs: (typeof likedSongs | typeof dislikedSongs)) =>
-            songs
-                .filter((s): s is typeof s & { song: DbSong } => s.song !== null)
-                .map((s) => ({name: s.song.name, artist: s.song.artist, reason: s.reason}));
+            console.log('[APP PAGE ACTION] recommendSongs: found', likedSongs.length, 'likes,', dislikedSongs.length, 'dislikes');
 
-        const {recommendSongs} = await import('$lib/server/groq');
-        const recommendations = await recommendSongs(
-            profileSongs(likedSongs),
-            profileSongs(dislikedSongs),
-            user.musicalDna,
-            undefined
-        );
+            const profileSongs = (songs: (typeof likedSongs | typeof dislikedSongs)) =>
+                songs
+                    .filter((s): s is typeof s & { song: DbSong } => s.song !== null)
+                    .map((s) => ({name: s.song.name, artist: s.song.artist, reason: s.reason}));
 
-        const searchPromises = recommendations.map(([song, artist]) => {
-            const query = `track:"${song}" artist:"${artist}"`;
+            console.log('[APP PAGE ACTION] recommendSongs: calling AI');
+            const {recommendSongs} = await import('$lib/server/groq');
+            const recommendations = await recommendSongs(
+                profileSongs(likedSongs),
+                profileSongs(dislikedSongs),
+                user.musicalDna,
+                undefined
+            );
 
-            const searchParams = new URLSearchParams({
-                q: query,
-                type: 'track',
-                limit: '1'
-            });
-            return spotifyFetch(fetch, `https://api.spotify.com/v1/search?${searchParams}`, user);
-        });
+            console.log('[APP PAGE ACTION] recommendSongs: got', recommendations.length, 'recommendations');
 
-        const searchResults = await Promise.all(searchPromises);
-        const searchJson = await Promise.all(searchResults.map((res) => res.json()));
+            const searchPromises = recommendations.map(([song, artist]) => {
+                const query = `track:"${song}" artist:"${artist}"`;
 
-        const recommendedTracks = searchJson
-            .map((j, i) => {
-                const track = j.tracks?.items[0];
-                if (track) {
-                    return {track, explanation: recommendations[i][2]};
-                }
-                // Create a placeholder track if not found on Spotify
-                return {
-                    track: {
-                        id: `ai-rec-${i}-${Date.now()}`, // Unique ID for Svelte key
-                        name: recommendations[i][0],
-                        artists: [{name: recommendations[i][1]} as SpotifyApi.ArtistObjectSimplified],
-                        album: {images: []},
-                        external_urls: {spotify: ''}
-                    },
-                    explanation: 'This song is not available on Spotify.'
-                };
+                const searchParams = new URLSearchParams({
+                    q: query,
+                    type: 'track',
+                    limit: '1'
+                });
+                return spotifyFetch(fetch, `https://api.spotify.com/v1/search?${searchParams}`, user);
             });
 
-        return {recommendedTracks};
+            const searchResults = await Promise.all(searchPromises);
+            const searchJson = await Promise.all(searchResults.map((res) => res.json()));
+
+            const recommendedTracks = searchJson
+                .map((j, i) => {
+                    const track = j.tracks?.items[0];
+                    if (track) {
+                        return {track, explanation: recommendations[i][2]};
+                    }
+                    // Create a placeholder track if not found on Spotify
+                    return {
+                        track: {
+                            id: `ai-rec-${i}-${Date.now()}`, // Unique ID for Svelte key
+                            name: recommendations[i][0],
+                            artists: [{name: recommendations[i][1]} as SpotifyApi.ArtistObjectSimplified],
+                            album: {images: []},
+                            external_urls: {spotify: ''}
+                        },
+                        explanation: 'This song is not available on Spotify.'
+                    };
+                });
+
+            console.log('[APP PAGE ACTION] recommendSongs: success');
+            return {recommendedTracks};
+        } catch (e) {
+            console.error('[APP PAGE ACTION] recommendSongs error:', e);
+            throw e;
+        }
     },
 
     recommendFromSongs: async ({request, locals, fetch}) => {
