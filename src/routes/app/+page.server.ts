@@ -216,24 +216,34 @@ export const actions: Actions = {
         return {success: true, removedSongId: songId};
     },
 
-    removeLike: async ({request, locals}) => {
-        const {user} = locals;
-        if (!user) {
-            throw redirect(303, '/');
-        }
-
-        const formData = await request.formData();
-        const songId = formData.get('songId');
-
-        if (!songId || typeof songId !== 'string') {
-            return fail(400, {message: 'Invalid song ID'});
-        }
-
-        await db
-            .delete(userSongLike)
-            .where(and(eq(userSongLike.userId, user.id), eq(userSongLike.songId, songId)));
-
-        return {success: true, removedSongId: songId};
+    removeLike: async ({request, locals, fetch}) => {
+    	const {user} = locals;
+    	if (!user) {
+    		throw redirect(303, '/');
+    	}
+   
+    	const formData = await request.formData();
+    	const songId = formData.get('songId');
+   
+    	if (!songId || typeof songId !== 'string') {
+    		return fail(400, {message: 'Invalid song ID'});
+    	}
+   
+    	// Remove from Spotify library
+    	await spotifyFetch(
+    		fetch,
+    		`https://api.spotify.com/v1/me/tracks?ids=${songId}`,
+    		user,
+    		{
+    			method: 'DELETE'
+    		}
+    	);
+   
+    	await db
+    		.delete(userSongLike)
+    		.where(and(eq(userSongLike.userId, user.id), eq(userSongLike.songId, songId)));
+   
+    	return {success: true, removedSongId: songId};
     },
 
     saveDislikeReason: async ({request, locals}) => {
@@ -301,7 +311,7 @@ export const actions: Actions = {
                 .filter((s): s is typeof s & { song: DbSong } => s.song !== null)
                 .map((s) => ({name: s.song.name, artist: s.song.artist, reason: s.reason}));
 
-        const {recommendSongs} = await import('$lib/server/google');
+        const {recommendSongs} = await import('$lib/server/groq');
         const recommendations = await recommendSongs(
             profileSongs(likedSongs),
             profileSongs(dislikedSongs),
@@ -381,7 +391,7 @@ export const actions: Actions = {
             reason: ''
         }));
 
-        const {recommendSongs} = await import('$lib/server/google');
+        const {recommendSongs} = await import('$lib/server/groq');
         const recommendations = await recommendSongs(
             [],
             profileSongs(dislikedSongs),

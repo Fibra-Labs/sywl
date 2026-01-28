@@ -2,7 +2,7 @@ import { json, redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { user as userTable, userSongDislike, userSongLike, type Song as DbSong } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
-import { createSoundProfile } from '$lib/server/google';
+import { createSoundProfile } from '$lib/server/groq';
 import { marked } from 'marked';
 import type { RequestHandler } from './$types';
 

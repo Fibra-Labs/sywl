@@ -20,7 +20,7 @@
 	let dnaVisible = $state(false);
 	let soundProfile = $state(data.soundProfile);
 	let musicalDna = $state(data.musicalDna);
-	let recommendationMode = $state<'liked' | 'specific'>('liked');
+	let recommendationMode = $state<'liked' | 'specific'>('specific');
 	let specificSongs = $state<SpotifyApi.TrackObjectFull[]>([]);
 
 	const filteredLikedSongs = $derived(
@@ -90,29 +90,35 @@
 		<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
 			<!-- Column 1: Songs you like -->
 			<div class="bg-gray-900/50 p-6 rounded-lg">
-				<div class="flex justify-between items-center mb-6">
-					<h2 class="text-2xl font-bold">Songs You Like</h2>
-					<form
-						method="POST"
-						action="?/resync"
-						use:enhance={() => {
-							isResyncing = true;
-							return async ({ result }) => {
-								if (result.type === 'success') await invalidateAll();
-								isResyncing = false;
-							};
-						}}
-					>
-						<button
-							type="submit"
-							class="flex items-center gap-2 text-sm text-gray-400 hover:text-white disabled:opacity-50 cursor-pointer"
-							disabled={isResyncing}
-						>
-							<Reload class="w-4 h-4 {isResyncing ? 'animate-spin' : ''}" />
-							{isResyncing ? 'Syncing...' : 'Re-sync'}
-						</button>
-					</form>
+				<h2 class="text-2xl font-bold mb-4">Songs You Like</h2>
+				
+				<!-- Info Notice -->
+				<div class="mb-4 p-3 bg-blue-900/30 border border-blue-700 rounded-lg text-sm text-blue-200">
+					<strong>Note:</strong> Songs you like are automatically saved to your Spotify library.
+					Removing a song here will also remove it from Spotify.
 				</div>
+				
+				<form
+					method="POST"
+					action="?/resync"
+					class="mb-6"
+					use:enhance={() => {
+						isResyncing = true;
+						return async ({ result }) => {
+							if (result.type === 'success') await invalidateAll();
+							isResyncing = false;
+						};
+					}}
+				>
+					<button
+						type="submit"
+						class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+						disabled={isResyncing}
+					>
+						<Reload class="w-4 h-4 {isResyncing ? 'animate-spin' : ''}" />
+						<span>{isResyncing ? 'Syncing from Spotify...' : 'Sync from Spotify'}</span>
+					</button>
+				</form>
 				<LikeSearch onsongLiked={invalidateAll} />
 				<div class="divide-y divide-gray-700">
 					{#if filteredLikedSongs.length > 0}
@@ -159,20 +165,20 @@
 
 				<div class="flex gap-2 mb-4">
 					<button
-						onclick={() => (recommendationMode = 'liked')}
-						class="flex-1 py-2 px-4 rounded text-sm font-semibold {recommendationMode === 'liked'
-							? 'bg-blue-600 text-white'
-							: 'bg-gray-700 hover:bg-gray-600 text-gray-300'}"
-					>
-						From My Liked Songs
-					</button>
-					<button
 						onclick={() => (recommendationMode = 'specific')}
 						class="flex-1 py-2 px-4 rounded text-sm font-semibold {recommendationMode === 'specific'
 							? 'bg-blue-600 text-white'
 							: 'bg-gray-700 hover:bg-gray-600 text-gray-300'}"
 					>
 						From specific song(s)
+					</button>
+					<button
+						onclick={() => (recommendationMode = 'liked')}
+						class="flex-1 py-2 px-4 rounded text-sm font-semibold {recommendationMode === 'liked'
+							? 'bg-blue-600 text-white'
+							: 'bg-gray-700 hover:bg-gray-600 text-gray-300'}"
+					>
+						From My Sound Profile
 					</button>
 				</div>
 
