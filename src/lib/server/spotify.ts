@@ -26,6 +26,9 @@ const generateRandomString = (length: number) => {
 };
 
 export const spotifyLogin = (event: RequestEvent) => {
+	console.log('[SPOTIFY LOGIN] Initiating OAuth flow');
+	console.log('[SPOTIFY LOGIN] SPOTIFY_REDIRECT_URI:', SPOTIFY_REDIRECT_URI);
+	
 	const state = generateRandomString(16);
 	const scope = 'user-read-email user-library-read user-library-modify';
 
@@ -39,7 +42,10 @@ export const spotifyLogin = (event: RequestEvent) => {
 		state
 	});
 
-	throw redirect(303, `https://accounts.spotify.com/authorize?${searchParams.toString()}`);
+	const authUrl = `https://accounts.spotify.com/authorize?${searchParams.toString()}`;
+	console.log('[SPOTIFY LOGIN] Redirecting to:', authUrl);
+
+	throw redirect(303, authUrl);
 };
 
 const refreshAccessToken = async (refreshToken: string) => {
