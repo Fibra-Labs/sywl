@@ -43,9 +43,12 @@ const SYSTEM_INSTRUCTION = `<golden_rule>Reply using markdown for formatting. Th
 				🧪 PHASE 3 – RULE EXTRACTION
 				Now build a set of musical DNA rules based on what the user consistently likes and rejects
 				Example Format:
+				    <example_format>
 				    Must Include: Charismatic vocals (raspy, soulful, rich)
 				    Clear rhythm or internal motion- Strong melody or hook - Emotion that's grounded, restrained, or confidently expressive - Production that feels organic, analog, or tactile
-				    Must Avoid: Whiny, breathy, or theatrical vocal delivery- Ambient, floating, or meandering song structure - Overproduced, sterile sound design - Emotionally vague or melodramatic songs with no musical anchor`;
+				    Must Avoid: Whiny, breathy, or theatrical vocal delivery- Ambient, floating, or meandering song structure - Overproduced, sterile sound design - Emotionally vague or melodramatic songs with no musical anchor
+                    </example_format>`;
+
 
 export const createSoundProfile = async (
 	likedSongs: ProfileSong[],
@@ -123,11 +126,11 @@ export const recommendSongs = async (
 		.map((s) => `- ${s.name} by ${s.artist}${s.reason ? ` (Reason: ${s.reason})` : ''}`)
 		.join('\n');
 
-	const prompt = `Based on the user's taste, recommend 5 songs that are NOT in their liked songs list. For each song, provide the song title, artist, and a brief explanation for the recommendation, using " | " as a separator. Each recommendation must be on a new line.
+	const prompt = `Based on the user's taste, recommend 5 songs that are NOT in their liked songs list. For each song, provide the song title, artist, and a brief explanation for the recommendation, using " | " as a separator, do not enumerate them. Each recommendation must be on a new line.
 ${
 		sourceSongs && sourceSongs.length > 0
 			? `
-Recommendations should be hyper-relevantly based on this specific list of songs the user likes. and the explanation should let the user know how recommendations relate to this list of songs:
+Recommendations should be hyper-relevantly based on this specific list of songs the user likes, and the explanation should let the user know how recommendations relate to this list of songs:
 
 <HYPER_RELEVANT_SONGS>
 ${sourceSongs.map(s => `- ${s.name} by ${s.artist}`).join('\n')}
