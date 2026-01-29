@@ -36,7 +36,7 @@ export class GeminiProvider extends BaseAIProvider {
 			model: this.google(this.model),
 			system: SYSTEM_INSTRUCTION,
 			prompt,
-			temperature: 0.7,
+			temperature: 1,
 			maxOutputTokens: 8192
 		});
 
@@ -46,8 +46,8 @@ export class GeminiProvider extends BaseAIProvider {
 			model: this.google(this.model),
 			system: SUMMARY_SYSTEM_INSTRUCTION,
 			prompt: summaryPrompt,
-			temperature: 0.7,
-			maxOutputTokens: 512
+			temperature: 1,
+			maxOutputTokens: 8192
 		});
 
 		// Fallback if summary is empty
@@ -77,7 +77,8 @@ export class GeminiProvider extends BaseAIProvider {
 			model: this.google(this.model),
 			system: SYSTEM_INSTRUCTION,
 			prompt,
-			temperature: 0.8
+			temperature: 1,
+            maxOutputTokens: 8192
 		});
 
 		console.log('[SONGS RECOMMENDATIONS] Response', text);
