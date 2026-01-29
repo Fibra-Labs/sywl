@@ -22,5 +22,6 @@ RUN npm prune --omit=dev
 # Expose port
 EXPOSE 3000
 
-# Run
+# Run with instrumentation
+ENV NODE_OPTIONS="--require /app/instrumentation.cjs"
 CMD ["node", "build"]

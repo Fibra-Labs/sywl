@@ -1,4 +1,5 @@
 import type { user } from '$lib/server/db/schema';
+import type { Logger } from 'winston';
 
 declare global {
 	namespace App {
@@ -11,6 +12,9 @@ declare global {
 		// interface Platform {}
 		interface User extends ReturnType<typeof user.$inferSelect> {}
 	}
+
+	// Global logger instance
+	var logger: Logger;
 }
 
 export {};

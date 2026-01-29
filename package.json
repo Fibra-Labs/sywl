@@ -4,12 +4,13 @@
   "version": "0.0.1",
   "type": "module",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
-    "dev": "vite dev --host",
+    "dev": "NODE_OPTIONS='--require ./instrumentation.cjs' vite dev --host",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "NODE_OPTIONS='--require ./instrumentation.cjs' vite preview",
+    "start": "NODE_OPTIONS='--require ./instrumentation.cjs' node build/index.js",
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -25,10 +26,25 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@libsql/client": "^0.7.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.69.0",
+    "@opentelemetry/exporter-logs-otlp-http": "^0.211.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.211.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.211.0",
+    "@opentelemetry/instrumentation-winston": "^0.55.0",
+    "@opentelemetry/resources": "^2.5.0",
+    "@opentelemetry/sdk-logs": "^0.211.0",
+    "@opentelemetry/sdk-metrics": "^2.5.0",
+    "@opentelemetry/sdk-node": "^0.211.0",
+    "@opentelemetry/semantic-conventions": "^1.39.0",
+    "@opentelemetry/winston-transport": "^0.21.0",
     "@types/marked": "^5.0.2",
+    "dotenv": "^17.2.3",
     "drizzle-orm": "^0.32.1",
     "groq-sdk": "^0.37.0",
-    "marked": "^16.2.1"
+    "marked": "^16.2.1",
+    "svelte-sonner": "^1.0.7",
+    "winston": "^3.19.0"
   },
   "devDependencies": {
     "@eslint/compat": "^1.2.5",
@@ -56,6 +72,7 @@
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "tailwindcss": "^4.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.20.0",
     "vite": "^7.0.4",

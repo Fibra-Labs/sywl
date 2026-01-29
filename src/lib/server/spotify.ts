@@ -26,8 +26,8 @@ const generateRandomString = (length: number) => {
 };
 
 export const spotifyLogin = (event: RequestEvent) => {
-	console.log('[SPOTIFY LOGIN] Initiating OAuth flow');
-	console.log('[SPOTIFY LOGIN] SPOTIFY_REDIRECT_URI:', SPOTIFY_REDIRECT_URI);
+	logger.debug('[SPOTIFY LOGIN] Initiating OAuth flow');
+	logger.debug(`[SPOTIFY LOGIN] SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI}`);
 	
 	const state = generateRandomString(16);
 	const scope = 'user-read-email user-library-read user-library-modify';
@@ -43,13 +43,13 @@ export const spotifyLogin = (event: RequestEvent) => {
 	});
 
 	const authUrl = `https://accounts.spotify.com/authorize?${searchParams.toString()}`;
-	console.log('[SPOTIFY LOGIN] Redirecting to:', authUrl);
+	logger.debug(`[SPOTIFY LOGIN] Redirecting to: ${authUrl}`);
 
 	throw redirect(303, authUrl);
 };
 
 const refreshAccessToken = async (refreshToken: string) => {
-    console.log('Refreshing token');
+    logger.debug('[SPOTIFY] Refreshing token');
 	const response = await fetch('https://accounts.spotify.com/api/token', {
 		method: 'POST',
 		headers: {
@@ -65,7 +65,7 @@ const refreshAccessToken = async (refreshToken: string) => {
 	const tokens = await response.json();
 
 	if (!response.ok) {
-        console.log('There was an error refreshing the token');
+        logger.error('[SPOTIFY] There was an error refreshing the token');
 		throw new Error(tokens.error_description);
 	}
 
@@ -87,7 +87,7 @@ export const spotifyFetch = async (
 	user: App.User,
 	options: RequestInit = {}
 ): Promise<Response> => {
-    console.log('Fetching from spotify');
+	   logger.debug('[SPOTIFY] Fetching from Spotify API');
 	let { accessToken, expiresAt, refreshToken } = user;
 
 	if (Date.now() > expiresAt) {
@@ -109,7 +109,7 @@ export const getMySavedTracks = async (
 	fetcher: typeof fetch,
 	user: App.User
 ): Promise<Song[]> => {
-    console.log('Getting saved tracks');
+	   logger.debug('[SPOTIFY] Getting saved tracks');
 	const response = await spotifyFetch(fetcher, 'https://api.spotify.com/v1/me/tracks?limit=50', user);
 	if (!response.ok) {
 		return [];

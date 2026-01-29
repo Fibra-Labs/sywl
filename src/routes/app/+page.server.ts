@@ -4,16 +4,17 @@ import {db} from '$lib/server/db';
 import {song as songTable, type Song as DbSong, userSongDislike, userSongLike} from '$lib/server/db/schema';
 import {and, desc, eq} from 'drizzle-orm';
 import {getMySavedTracks, spotifyFetch} from '$lib/server/spotify';
+import logger from '$lib/server/logger';
 
 export const load: PageServerLoad = async ({parent}) => {
-    console.log('[APP PAGE] Loading app page');
+    logger.debug('[APP PAGE] Loading app page');
     const {user} = await parent();
     if (!user) {
-        console.log('[APP PAGE] No user, redirecting');
+        logger.debug('[APP PAGE] No user, redirecting');
         throw redirect(303, '/');
     }
 
-    console.log('[APP PAGE] User ID:', user.id);
+    logger.debug(`[APP PAGE] User ID: ${user.id}`);
 
     try {
         const [likedSongsFromDb, dislikedSongsFromDb] = await Promise.all([
@@ -49,7 +50,7 @@ export const load: PageServerLoad = async ({parent}) => {
                 createdAt: dislike.createdAt
             }));
 
-        console.log('[APP PAGE] Loaded', likedSongs.length, 'likes,', dislikedSongs.length, 'dislikes');
+        logger.info(`[APP PAGE] Loaded ${likedSongs.length} likes, ${dislikedSongs.length} dislikes`);
 
         return {
             likedSongs,
@@ -58,7 +59,7 @@ export const load: PageServerLoad = async ({parent}) => {
             musicalDna: user.musicalDna
         };
     } catch (e) {
-        console.error('[APP PAGE] Error loading data:', e);
+        logger.error(`[APP PAGE] Error loading data: ${e}`);
         throw e;
     }
 };
@@ -140,10 +141,10 @@ export const actions: Actions = {
     },
 
     likeSong: async ({request, locals, fetch}) => {
-        console.log('[APP PAGE ACTION] likeSong started');
+        logger.info('[APP PAGE ACTION] likeSong started');
         const {user} = locals;
         if (!user) {
-            console.log('[APP PAGE ACTION] likeSong: no user');
+            logger.info('[APP PAGE ACTION] likeSong: no user');
             throw redirect(303, '/');
         }
 
@@ -153,12 +154,12 @@ export const actions: Actions = {
             const reason = formData.get('reason');
 
             if (!songData || typeof songData !== 'string' || typeof reason !== 'string') {
-                console.log('[APP PAGE ACTION] likeSong: invalid input');
+                logger.info('[APP PAGE ACTION] likeSong: invalid input');
                 return fail(400, {message: 'Invalid input'});
             }
 
             const song: SpotifyApi.TrackObjectFull = JSON.parse(songData);
-            console.log('[APP PAGE ACTION] likeSong:', song.id);
+            logger.info(`[APP PAGE ACTION] likeSong: ${song.id}`);
 
             await db
                 .insert(songTable)
@@ -187,10 +188,10 @@ export const actions: Actions = {
                 createdAt: new Date()
             }).onConflictDoNothing();
 
-            console.log('[APP PAGE ACTION] likeSong: success');
+            logger.info('[APP PAGE ACTION] likeSong: success');
             return {success: true, likedSongId: song.id};
         } catch (e) {
-            console.error('[APP PAGE ACTION] likeSong error:', e);
+            logger.error(`[APP PAGE ACTION] likeSong error: ${e}`);
             throw e;
         }
     },
@@ -238,33 +239,33 @@ export const actions: Actions = {
     },
 
     removeLike: async ({request, locals, fetch}) => {
-    	const {user} = locals;
-    	if (!user) {
-    		throw redirect(303, '/');
-    	}
-   
-    	const formData = await request.formData();
-    	const songId = formData.get('songId');
-   
-    	if (!songId || typeof songId !== 'string') {
-    		return fail(400, {message: 'Invalid song ID'});
-    	}
-   
-    	// Remove from Spotify library
-    	await spotifyFetch(
-    		fetch,
-    		`https://api.spotify.com/v1/me/tracks?ids=${songId}`,
-    		user,
-    		{
-    			method: 'DELETE'
-    		}
-    	);
-   
-    	await db
-    		.delete(userSongLike)
-    		.where(and(eq(userSongLike.userId, user.id), eq(userSongLike.songId, songId)));
-   
-    	return {success: true, removedSongId: songId};
+        const {user} = locals;
+        if (!user) {
+            throw redirect(303, '/');
+        }
+
+        const formData = await request.formData();
+        const songId = formData.get('songId');
+
+        if (!songId || typeof songId !== 'string') {
+            return fail(400, {message: 'Invalid song ID'});
+        }
+
+        // Remove from Spotify library
+        await spotifyFetch(
+            fetch,
+            `https://api.spotify.com/v1/me/tracks?ids=${songId}`,
+            user,
+            {
+                method: 'DELETE'
+            }
+        );
+
+        await db
+            .delete(userSongLike)
+            .where(and(eq(userSongLike.userId, user.id), eq(userSongLike.songId, songId)));
+
+        return {success: true, removedSongId: songId};
     },
 
     saveDislikeReason: async ({request, locals}) => {
@@ -311,10 +312,10 @@ export const actions: Actions = {
     },
 
     recommendSongs: async ({locals, fetch}) => {
-        console.log('[APP PAGE ACTION] recommendSongs started');
+        logger.info('[APP PAGE ACTION] recommendSongs started');
         const {user} = locals;
         if (!user) {
-            console.log('[APP PAGE ACTION] recommendSongs: no user');
+            logger.info('[APP PAGE ACTION] recommendSongs: no user');
             throw redirect(303, '/');
         }
 
@@ -330,14 +331,14 @@ export const actions: Actions = {
                 })
             ]);
 
-            console.log('[APP PAGE ACTION] recommendSongs: found', likedSongs.length, 'likes,', dislikedSongs.length, 'dislikes');
+            logger.info(`[APP PAGE ACTION] recommendSongs: found ${likedSongs.length} likes, ${dislikedSongs.length} dislikes`);
 
             const profileSongs = (songs: (typeof likedSongs | typeof dislikedSongs)) =>
                 songs
                     .filter((s): s is typeof s & { song: DbSong } => s.song !== null)
                     .map((s) => ({name: s.song.name, artist: s.song.artist, reason: s.reason}));
 
-            console.log('[APP PAGE ACTION] recommendSongs: calling AI');
+            logger.info('[APP PAGE ACTION] recommendSongs: calling AI');
             const {recommendSongs} = await import('$lib/server/groq');
             const recommendations = await recommendSongs(
                 profileSongs(likedSongs),
@@ -346,7 +347,7 @@ export const actions: Actions = {
                 undefined
             );
 
-            console.log('[APP PAGE ACTION] recommendSongs: got', recommendations.length, 'recommendations');
+            logger.info(`[APP PAGE ACTION] recommendSongs: got ${recommendations.length} recommendations`);
 
             const searchPromises = recommendations.map(([song, artist]) => {
                 const query = `track:"${song}" artist:"${artist}"`;
@@ -381,19 +382,22 @@ export const actions: Actions = {
                     };
                 });
 
-            console.log('[APP PAGE ACTION] recommendSongs: success');
+            logger.info('[APP PAGE ACTION] recommendSongs: success');
             return {recommendedTracks};
         } catch (e) {
-            console.error('[APP PAGE ACTION] recommendSongs error:', e);
-            throw e;
+            logger.error(`[APP PAGE ACTION] recommendSongs error: ${e}`);
+            // Return user-friendly error instead of crashing
+            return fail(503, {
+                message: 'Unable to generate recommendations at this time. This may be due to API rate limiting. Please try again in a few moments.'
+            });
         }
     },
 
     recommendFromSongs: async ({request, locals, fetch}) => {
-        console.log('[APP PAGE ACTION] recommendFromSongs started');
+        logger.info('[APP PAGE ACTION] recommendFromSongs started');
         const {user} = locals;
         if (!user) {
-            console.log('[APP PAGE ACTION] recommendFromSongs: no user');
+            logger.info('[APP PAGE ACTION] recommendFromSongs: no user');
             throw redirect(303, '/');
         }
 
@@ -402,11 +406,11 @@ export const actions: Actions = {
             const songsData = formData.get('songs');
 
             if (!songsData || typeof songsData !== 'string') {
-                console.log('[APP PAGE ACTION] recommendFromSongs: invalid input');
+                logger.info('[APP PAGE ACTION] recommendFromSongs: invalid input');
                 return fail(400, {message: 'Invalid input'});
             }
             const sourceSongs: SpotifyApi.TrackObjectFull[] = JSON.parse(songsData);
-            console.log('[APP PAGE ACTION] recommendFromSongs: source songs:', sourceSongs.map(s => `${s.name} - ${s.artists[0]?.name}`));
+            logger.info(`[APP PAGE ACTION] recommendFromSongs: source songs: ${sourceSongs.map(s => `${s.name} - ${s.artists[0]?.name}`)}`);
 
             const [dislikedSongs] = await Promise.all([
                 db.query.userSongDislike.findMany({
@@ -416,7 +420,7 @@ export const actions: Actions = {
             ]);
 
             if (sourceSongs.length === 0) {
-                console.log('[APP PAGE ACTION] recommendFromSongs: no source songs');
+                logger.info('[APP PAGE ACTION] recommendFromSongs: no source songs');
                 return fail(400, {message: 'No source songs provided.'});
             }
 
@@ -431,7 +435,7 @@ export const actions: Actions = {
                 reason: ''
             }));
 
-            console.log('[APP PAGE ACTION] recommendFromSongs: calling AI');
+            logger.info('[APP PAGE ACTION] recommendFromSongs: calling AI');
             const {recommendSongs} = await import('$lib/server/groq');
             const recommendations = await recommendSongs(
                 [],
@@ -440,8 +444,8 @@ export const actions: Actions = {
                 sourceSongsForPrompt
             );
 
-            console.log('[APP PAGE ACTION] recommendFromSongs: got', recommendations.length, 'recommendations');
-            console.log('[APP PAGE ACTION] recommendFromSongs: recommendations:', recommendations.map(r => `${r[0]} - ${r[1]}`));
+            logger.info(`[APP PAGE ACTION] recommendFromSongs: got ${recommendations.length} recommendations`);
+            logger.info(`[APP PAGE ACTION] recommendFromSongs: recommendations: ${recommendations.map(r => `${r[0]} - ${r[1]}`)}`);
 
             const searchPromises = recommendations.map(([song, artist]) => {
                 const query = `track:"${song}" artist:"${artist}"`;
@@ -469,11 +473,14 @@ export const actions: Actions = {
                 };
             });
 
-            console.log('[APP PAGE ACTION] recommendFromSongs: success');
+            logger.info('[APP PAGE ACTION] recommendFromSongs: success');
             return {recommendedTracks};
         } catch (e) {
-            console.error('[APP PAGE ACTION] recommendFromSongs error:', e);
-            throw e;
+            logger.error(`[APP PAGE ACTION] recommendFromSongs error: ${e}`);
+            // Return user-friendly error instead of crashing
+            return fail(503, {
+                message: 'Unable to generate recommendations at this time. This may be due to API rate limiting. Please try again in a few moments.'
+            });
         }
     }
 };

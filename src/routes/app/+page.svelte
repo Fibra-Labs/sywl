@@ -7,6 +7,7 @@
 	import Reload from '$lib/components/Reload.svelte';
 	import RecommendationCard from '$lib/components/RecommendationCard.svelte';
 	import RecommendationSearch from '$lib/components/RecommendationSearch.svelte';
+	import { toast } from 'svelte-sonner';
 
 	let { data, form } = $props<{ data: App.PageData; form: any }>();
 
@@ -31,7 +32,7 @@
 
 	const filteredLikedSongs = $derived(
 		data.likedSongs.filter(
-			(song) =>
+			(song: any) =>
 				song.name.toLowerCase().includes(likedSongsSearch.toLowerCase()) ||
 				song.artist.toLowerCase().includes(likedSongsSearch.toLowerCase())
 		)
@@ -40,6 +41,11 @@
 	$effect(() => {
 		if (form?.recommendedTracks) {
 			recommendedTracks = form.recommendedTracks;
+		}
+		
+		// Display error messages as toast notifications
+		if (form?.message) {
+			toast.error(form.message, { duration: 8000 });
 		}
 	});
 </script>
@@ -80,13 +86,23 @@
 					disabled={isCreatingProfile}
 					onclick={async () => {
 						isCreatingProfile = true;
-						const response = await fetch('/api/sound-profile', { method: 'POST' });
-						if (response.ok) {
+						try {
+							const response = await fetch('/api/sound-profile', { method: 'POST' });
+							if (!response.ok) {
+								const error = await response.json();
+								toast.error(error.message || 'Failed to create sound profile');
+								isCreatingProfile = false;
+								return;
+							}
 							const result = await response.json();
 							soundProfile = result.soundProfile;
 							musicalDna = result.musicalDna;
+							toast.success('Sound profile updated successfully!');
+						} catch (e) {
+							toast.error('Failed to connect to the server');
+						} finally {
+							isCreatingProfile = false;
 						}
-						isCreatingProfile = false;
 					}}
 				>
 					{#if isCreatingProfile} <Reload class="w-5 h-5 animate-spin" /> {/if} {isCreatingProfile ? 'Analyzing...' : 'Update My Sound Profile'}
