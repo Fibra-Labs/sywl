@@ -11,7 +11,7 @@ RUN rm -f package-lock.json && npm install
 COPY . .
 
 # migrate db
-RUN npm run db:migrate
+RUN mkdir -p data && touch data/local.db && npm run db:migrate
 
 # Build
 RUN npm run build
