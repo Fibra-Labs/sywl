@@ -30,9 +30,10 @@ export const spotifyLogin = (event: RequestEvent) => {
 	logger.debug(`[SPOTIFY LOGIN] SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI}`);
 	
 	const state = generateRandomString(16);
-	const scope = 'user-read-email user-library-read user-library-modify';
+    const scope = 'user-read-email user-read-private user-library-read user-library-modify';
 
-	event.cookies.set('spotify_auth_state', state, { path: '/' });
+
+    event.cookies.set('spotify_auth_state', state, { path: '/' });
 
 	const searchParams = new URLSearchParams({
 		response_type: 'code',
