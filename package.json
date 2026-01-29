@@ -24,6 +24,8 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.17",
+    "@ai-sdk/groq": "^3.0.18",
     "@google/generative-ai": "^0.24.1",
     "@libsql/client": "^0.7.0",
     "@opentelemetry/api": "^1.9.0",
@@ -39,6 +41,7 @@
     "@opentelemetry/semantic-conventions": "^1.39.0",
     "@opentelemetry/winston-transport": "^0.21.0",
     "@types/marked": "^5.0.2",
+    "ai": "^6.0.61",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.32.1",
     "groq-sdk": "^0.37.0",

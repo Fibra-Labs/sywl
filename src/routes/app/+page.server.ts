@@ -51,17 +51,23 @@ export const load: PageServerLoad = async ({parent}) => {
             }));
 
         logger.info(`[APP PAGE] Loaded ${likedSongs.length} likes, ${dislikedSongs.length} dislikes`);
-
+      
         return {
-            likedSongs,
-            dislikedSongs,
-            soundProfile: user.soundProfile,
-            musicalDna: user.musicalDna
+        	likedSongs,
+        	dislikedSongs,
+        	soundProfile: user.soundProfile,
+        	musicalDna: user.musicalDna
         };
-    } catch (e) {
+       } catch (e) {
         logger.error(`[APP PAGE] Error loading data: ${e}`);
-        throw e;
-    }
+        // Return default state instead of crashing
+        return {
+        	likedSongs: [],
+        	dislikedSongs: [],
+        	soundProfile: null,
+        	musicalDna: null
+        };
+       }
 };
 
 export const actions: Actions = {
@@ -85,18 +91,17 @@ export const actions: Actions = {
         });
 
         const response = await spotifyFetch(
-            fetch,
-            `https://api.spotify.com/v1/search?${searchParams.toString()}`,
-            user
+        	fetch,
+        	`https://api.spotify.com/v1/search?${searchParams.toString()}`,
+        	user
         );
-
+      
         if (!response.ok) {
-            const errorJson = await response.json();
-            throw error(response.status, errorJson.error.message);
+        	return fail(500, { error: 'Failed to search. Please try again.' });
         }
-
+      
         const data = await response.json();
-
+      
         return {searchResults: data.tracks.items};
     },
 
@@ -339,7 +344,7 @@ export const actions: Actions = {
                     .map((s) => ({name: s.song.name, artist: s.song.artist, reason: s.reason}));
 
             logger.info('[APP PAGE ACTION] recommendSongs: calling AI');
-            const {recommendSongs} = await import('$lib/server/groq');
+            const {recommendSongs} = await import('$lib/server/ai');
             const recommendations = await recommendSongs(
                 profileSongs(likedSongs),
                 profileSongs(dislikedSongs),
@@ -436,7 +441,7 @@ export const actions: Actions = {
             }));
 
             logger.info('[APP PAGE ACTION] recommendFromSongs: calling AI');
-            const {recommendSongs} = await import('$lib/server/groq');
+            const {recommendSongs} = await import('$lib/server/ai');
             const recommendations = await recommendSongs(
                 [],
                 profileSongs(dislikedSongs),

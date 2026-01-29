@@ -47,9 +47,9 @@ export const POST = async ({ request, locals, fetch }) => {
 				const errorJson = await response.json();
 				span.recordException(new Error(errorJson.error.message));
 				span.end();
-				throw error(response.status, errorJson.error.message);
+				return json({ error: 'Failed to search. Please try again.' }, { status: 500 });
 			}
-
+	
 			const data = await response.json();
 			logger.debug(`[SEARCH API] Found ${data.tracks.items.length} tracks`);
 			span.setAttribute('search.results_count', data.tracks.items.length);
@@ -59,7 +59,7 @@ export const POST = async ({ request, locals, fetch }) => {
 			logger.error(`[SEARCH API] Error: ${e}`);
 			span.recordException(e as Error);
 			span.end();
-			throw e;
+			return json({ error: 'Failed to search. Please try again.' }, { status: 500 });
 		}
 	});
 };

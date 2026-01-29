@@ -6,6 +6,19 @@ type ProfileSong = Pick<Song, 'name' | 'artist'> & { reason: string | null };
 
 const model = 'openai/gpt-oss-120b';
 // const model = 'meta-llama/llama-4-maverick-17b-128e-instruct';
+// const model = 'llama-3.3-70b-versatile';
+// | 'compound-beta'
+// | 'compound-beta-mini'
+// | 'gemma2-9b-it'
+// | 'llama-3.1-8b-instant'
+// | 'llama-3.3-70b-versatile'
+// | 'meta-llama/llama-4-maverick-17b-128e-instruct'
+// | 'meta-llama/llama-4-scout-17b-16e-instruct'
+// | 'meta-llama/llama-guard-4-12b'
+// | 'moonshotai/kimi-k2-instruct'
+// | 'openai/gpt-oss-120b'
+// | 'openai/gpt-oss-20b'
+// | 'qwen/qwen3-32b';
 
 const groq = new Groq({
     apiKey: env.GROQ_API_KEY
@@ -87,7 +100,7 @@ Output the PHASE 3 output (but call it "in-depth musical DNA") (musical DNA rule
         ],
         model: model,
         temperature: 0.7,
-        max_tokens: 8192
+        max_completion_tokens: 8192
     });
 
     const fullText = completion.choices[0]?.message?.content || '';
@@ -140,7 +153,7 @@ export const recommendSongs = async (
 
     const prompt = `GOLDEN RULE: RESPECT THE OUTPUT FORMAT I'M REQUESTING OTHERWISE THE APP THAT USES THIS PROMPT WILL FAIL.
 
-Based on the user's taste, recommend 5 songs that are not super "well known" and are NOT in their liked songs list. Keep in mind you're not meant to just give "more artists like the one the user likes" but rather tailor it to specific songs. Don't be generic, it doesn't matter if an artist usually does certain style of music, it's the specific song that needs to match the recommendation.
+Based on the user's request, recommend 10 songs and are NOT in their liked songs list. Keep in mind you're not meant to just give "more artists like the one the user likes" but rather tailor it to specific songs.
 
 CRITICAL FORMAT REQUIREMENT:
 Each recommendation MUST be EXACTLY in this format: Song Title | Artist Name | Brief explanation
@@ -163,13 +176,18 @@ Recommendations should be hyper-relevantly based on this specific list of songs 
 <HYPER_RELEVANT_SONGS>
 ${sourceSongs.map(s => `- ${s.name} by ${s.artist}`).join('\n')}
 </HYPER_RELEVANT_SONGS>
+
+Analyse the hyper_relevant_songs in depth, truly capture their genre (not the artist's genre but the song's genre) and unique qualities.
+Ensure that the recommended songs are NOT based on the artist's traditional genre, but rather recommend songs that match qualities found on these hyper-relevant songs.
+For instance, an artist that performs a HYPER_RELEVANT_SONG might always do ROCK music, but in this instance the song the user likes is TANGO. So the recommended songs should follow that genre (TANGO) and not just give recommendations based on what the artist usually does.
+Make sure your recommendations don't include the same songs that the user has in their hyper relevant songs.
+Make sure the recommendations follow the same genre as the hyper relevant songs.
+DO NOT MIX GENRES, SALSA IS NOT REGGAETON, NOT BACHATA, ETC. BE SPECIFIC.
+
 `
-            : ''
-    }
-
-This is the user's musical DNA:
-${musicalDna ?? 'No DNA generated yet.'}
-
+            : `This is the user's musical DNA: ${musicalDna}
+            
+            
 <LIKED_SONGS>
 ${likedText}
 </LIKED_SONGS>
@@ -178,10 +196,13 @@ ${likedText}
 ${dislikedText}
 </DISLIKED_SONGS>
 
+`
+    }
+
 ${sourceSongs && sourceSongs.length > 0 ? `For each recommendation, explain how it relates to the list of HYPER RELEVANT SONGS that were provided.` : ''}
 `;
 
-    logger.debug(`[GROQ] Prompt: ${prompt}`);
+    console.log(`[GROQ] Prompt: ${prompt}`);
 
     const completion = await groq.chat.completions.create({
         messages: [

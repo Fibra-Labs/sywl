@@ -2,7 +2,7 @@ import { json, redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { type Song as DbSong, user as userTable, userSongDislike, userSongLike } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
-import { createSoundProfile } from '$lib/server/groq';
+import { createSoundProfile } from '$lib/server/ai';
 import { marked } from 'marked';
 import type { RequestHandler } from './$types';
 import { trace } from '@opentelemetry/api';

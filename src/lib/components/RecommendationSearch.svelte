@@ -1,6 +1,7 @@
 <script lang="ts">
     import Spinner from '$lib/components/Spinner.svelte';
     import { enhance } from '$app/forms';
+    import { toast } from 'svelte-sonner';
 
     let {
         selectedSongs
@@ -35,22 +36,33 @@
             }
 
             isSearching = true;
-            const formData = new FormData();
-            formData.append('query', q);
-            const response = await fetch('/api/search', {
-                method: 'POST',
-                body: formData
-            });
+            try {
+                const formData = new FormData();
+                formData.append('query', q);
+                const response = await fetch('/api/search', {
+                    method: 'POST',
+                    body: formData
+                });
 
-            if (!active) return;
+                if (!active) return;
 
-            if (response.ok) {
-                const data = await response.json();
-                searchResults = data.searchResults;
-            } else {
+                if (response.ok) {
+                    const data = await response.json();
+                    searchResults = data.searchResults || [];
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    toast.error(errorData.error || 'Failed to search. Please try again.');
+                    searchResults = [];
+                }
+            } catch (e) {
+                if (!active) return;
+                toast.error('Failed to search. Please try again.');
                 searchResults = [];
+            } finally {
+                if (active) {
+                    isSearching = false;
+                }
             }
-            isSearching = false;
         }, 300);
 
         return () => {
