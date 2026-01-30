@@ -4,6 +4,7 @@
 
 import { generateText } from 'ai';
 import { createGroq } from '@ai-sdk/groq';
+import { trace } from '@opentelemetry/api';
 import { BaseAIProvider } from './base';
 import type { ProfileSong, SoundProfileResult } from '../types';
 import {
@@ -14,6 +15,9 @@ import {
 	buildRecommendationPrompt
 } from '../prompts';
 import { parseSongRecommendations } from '../utils';
+import { setSpanAttributes, setSpanError } from '$lib/server/tracing';
+
+const tracer = trace.getTracer('songs-you-will-love');
 
 export class GroqProvider extends BaseAIProvider {
 	private groq;
@@ -31,22 +35,98 @@ export class GroqProvider extends BaseAIProvider {
 		const prompt = buildProfileCreationPrompt(likedSongs, dislikedSongs);
 
 		// Generate the main musical DNA profile
-		const { text: musicalDna } = await generateText({
-			model: this.groq(this.model),
-			system: SYSTEM_INSTRUCTION,
-			prompt,
-			temperature: 0.7,
-			maxOutputTokens: 8192
+		const musicalDna = await tracer.startActiveSpan('ai.provider.groq.generate', async (span) => {
+			const temperature = 0.7;
+			const maxTokens = 8192;
+			const startTime = Date.now();
+
+			try {
+				setSpanAttributes(span, {
+					'ai.provider': 'groq',
+					'ai.model': this.model,
+					'ai.prompt_length': prompt.length,
+					'ai.temperature': temperature,
+					'ai.max_tokens': maxTokens
+				});
+
+				const result = await generateText({
+					model: this.groq(this.model),
+					system: SYSTEM_INSTRUCTION,
+					prompt,
+					temperature,
+					maxOutputTokens: maxTokens
+				});
+
+				const durationMs = Date.now() - startTime;
+				const responseText = result.text;
+
+				setSpanAttributes(span, {
+					'ai.response_length': responseText.length,
+					'ai.response_tokens': result.usage?.totalTokens,
+					'ai.duration_ms': durationMs,
+					'ai.success': true
+				});
+
+				return responseText;
+			} catch (error) {
+				const durationMs = Date.now() - startTime;
+				setSpanAttributes(span, {
+					'ai.duration_ms': durationMs,
+					'ai.success': false
+				});
+				setSpanError(span, error);
+				throw error;
+			} finally {
+				span.end();
+			}
 		});
 
 		// Generate the summary
 		const summaryPrompt = buildSummaryPrompt(musicalDna);
-		const { text: soundProfile } = await generateText({
-			model: this.groq(this.model),
-			system: SUMMARY_SYSTEM_INSTRUCTION,
-			prompt: summaryPrompt,
-			temperature: 0.7,
-            maxOutputTokens: 512
+		const soundProfile = await tracer.startActiveSpan('ai.provider.groq.generate', async (span) => {
+			const temperature = 0.7;
+			const maxTokens = 512;
+			const startTime = Date.now();
+
+			try {
+				setSpanAttributes(span, {
+					'ai.provider': 'groq',
+					'ai.model': this.model,
+					'ai.prompt_length': summaryPrompt.length,
+					'ai.temperature': temperature,
+					'ai.max_tokens': maxTokens
+				});
+
+				const result = await generateText({
+					model: this.groq(this.model),
+					system: SUMMARY_SYSTEM_INSTRUCTION,
+					prompt: summaryPrompt,
+					temperature,
+					maxOutputTokens: maxTokens
+				});
+
+				const durationMs = Date.now() - startTime;
+				const responseText = result.text;
+
+				setSpanAttributes(span, {
+					'ai.response_length': responseText.length,
+					'ai.response_tokens': result.usage?.totalTokens,
+					'ai.duration_ms': durationMs,
+					'ai.success': true
+				});
+
+				return responseText;
+			} catch (error) {
+				const durationMs = Date.now() - startTime;
+				setSpanAttributes(span, {
+					'ai.duration_ms': durationMs,
+					'ai.success': false
+				});
+				setSpanError(span, error);
+				throw error;
+			} finally {
+				span.end();
+			}
 		});
 
 		// Fallback if summary is empty
@@ -68,19 +148,56 @@ export class GroqProvider extends BaseAIProvider {
 		musicalDna: string | null,
 		sourceSongs?: ProfileSong[]
 	): Promise<[string, string, string][]> {
-		const prompt = buildRecommendationPrompt(likedSongs, dislikedSongs, musicalDna, sourceSongs);
+		return tracer.startActiveSpan('ai.provider.groq.generate', async (span) => {
+			const prompt = buildRecommendationPrompt(likedSongs, dislikedSongs, musicalDna, sourceSongs);
+			const temperature = 0.8;
+			const maxTokens = undefined; // Not set for this call
+			const startTime = Date.now();
 
-		console.log(`[GROQ] Prompt: ${prompt}`);
+			try {
+				console.log(`[GROQ] Prompt: ${prompt}`);
 
-		const { text } = await generateText({
-			model: this.groq(this.model),
-			system: SYSTEM_INSTRUCTION,
-			prompt,
-			temperature: 0.8
+				// Set initial span attributes
+				setSpanAttributes(span, {
+					'ai.provider': 'groq',
+					'ai.model': this.model,
+					'ai.prompt_length': prompt.length,
+					'ai.temperature': temperature,
+					'ai.max_tokens': maxTokens
+				});
+
+				const result = await generateText({
+					model: this.groq(this.model),
+					system: SYSTEM_INSTRUCTION,
+					prompt,
+					temperature
+				});
+
+				const durationMs = Date.now() - startTime;
+				const responseText = result.text;
+
+				console.log('[SONGS RECOMMENDATIONS] Response', responseText);
+
+				// Set response attributes
+				setSpanAttributes(span, {
+					'ai.response_length': responseText.length,
+					'ai.response_tokens': result.usage?.totalTokens,
+					'ai.duration_ms': durationMs,
+					'ai.success': true
+				});
+
+				return parseSongRecommendations(responseText);
+			} catch (error) {
+				const durationMs = Date.now() - startTime;
+				setSpanAttributes(span, {
+					'ai.duration_ms': durationMs,
+					'ai.success': false
+				});
+				setSpanError(span, error);
+				throw error;
+			} finally {
+				span.end();
+			}
 		});
-
-		console.log('[SONGS RECOMMENDATIONS] Response', text);
-
-		return parseSongRecommendations(text);
 	}
 }

@@ -1,5 +1,6 @@
 // This file must be loaded before any other imports using NODE_OPTIONS=--require
 // It sets up OpenTelemetry instrumentation for Signoz
+require('source-map-support').install();
 
 // Load environment variables first
 require('dotenv').config()
