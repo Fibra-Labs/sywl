@@ -15,7 +15,7 @@ const { BatchLogRecordProcessor } = require('@opentelemetry/sdk-logs')
 const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node')
 const { WinstonInstrumentation } = require('@opentelemetry/instrumentation-winston')
 const { resourceFromAttributes } = require('@opentelemetry/resources')
-const { ATTR_SERVICE_NAME } = require('@opentelemetry/semantic-conventions')
+const { ATTR_SERVICE_NAME, ATTR_HOST_NAME } = require('@opentelemetry/semantic-conventions')
 
 // Suppress noisy OpenTelemetry diagnostic logs - only show errors
 diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.ERROR)
@@ -25,6 +25,7 @@ console.log('[OTEL] Initializing OpenTelemetry instrumentation...')
 try {
   const baseUrl = process.env.OTEL_EXPORTER_OTLP_ENDPOINT
   const serviceName = process.env.OTEL_SERVICE_NAME || 'sywl'
+  const hostName = process.env.HOST_NAME || 'vps'
 
   // Configure trace exporter
   const traceExporter = new OTLPTraceExporter({
@@ -54,6 +55,7 @@ try {
   const sdk = new NodeSDK({
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: serviceName,
+      [ATTR_HOST_NAME]: hostName,
     }),
     traceExporter,
     metricReaders: [metricReader],
@@ -72,6 +74,7 @@ try {
   sdk.start()
   console.log('[OTEL] OpenTelemetry SDK started successfully')
   console.log('[OTEL] Service:', serviceName)
+  console.log('[OTEL] Host:', hostName)
   console.log('[OTEL] Endpoint:', baseUrl)
   console.log('[OTEL] Instrumentation active - traces, metrics, and logs will be exported to Signoz')
 
