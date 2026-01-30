@@ -71,7 +71,7 @@ npm install
    - **App name**: Songs You Will Love (or any name)
    - **App description**: Personal music recommendation app
    - **Redirect URI**: `https://127.0.0.1:5173/login/spotify/callback`
-   - **Website**: Leave blank or add your local URL
+   - **Website**: Use your local URL, you can leave it blank or I actually published it here: https://sywl.fibra.dev/
    - **Which API/SDKs are you planning to use?**: Web API
 4. Save and note your **Client ID** and **Client Secret**
 
