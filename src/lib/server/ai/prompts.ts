@@ -38,12 +38,12 @@ export const SYSTEM_INSTRUCTION = `<golden_rule>Reply using markdown for formatt
 				- Acoustic Momentum – rhythmic folk/classical with motion
 				
 				🧪 PHASE 3 – RULE EXTRACTION
-				Now build a set of musical DNA rules based on what the user consistently likes and rejects
+				Now build a set of musical DNA rules based on what the user consistently likes and rejects (if there is no disliked songs omit this part)
 				Example Format:
 				    <example_format>
 				    Must Include: Charismatic vocals (raspy, soulful, rich)
 				    Clear rhythm or internal motion- Strong melody or hook - Emotion that's grounded, restrained, or confidently expressive - Production that feels organic, analog, or tactile
-				    Must Avoid: Whiny, breathy, or theatrical vocal delivery- Ambient, floating, or meandering song structure - Overproduced, sterile sound design - Emotionally vague or melodramatic songs with no musical anchor
+				    (if disliked songs exist, then add this section) -> Must Avoid: Whiny, breathy, or theatrical vocal delivery- Ambient, floating, or meandering song structure - Overproduced, sterile sound design - Emotionally vague or melodramatic songs with no musical anchor
                     </example_format>`;
 
 export const SUMMARY_SYSTEM_INSTRUCTION = `You are a music taste summarizer. Your task is to create a concise, engaging one-sentence summary of the user's musical DNA profile. The summary should capture the essence of their taste in an interesting and readable way.`;
@@ -58,6 +58,7 @@ export function buildProfileCreationPrompt(
 	const likedText = likedSongs
 		.map((s) => `- ${s.name} by ${s.artist}${s.reason ? ` (Reason: ${s.reason})` : ''}`)
 		.join('\n');
+
 	const dislikedText = dislikedSongs
 		.map((s) => `- ${s.name} by ${s.artist}${s.reason ? ` (Reason: ${s.reason})` : ''}`)
 		.join('\n');
@@ -65,10 +66,10 @@ export function buildProfileCreationPrompt(
 	return `Songs the user likes:
 ${likedText}
 
-Songs the user dislikes:
+Songs the user dislikes (if this is empty then do not include things to avoid):
 ${dislikedText}
 
-Output the PHASE 3 output (but call it "in-depth musical DNA") (musical DNA rules, including things to include and things to avoid).`;
+Output the PHASE 3 output (but call it "in-depth musical DNA") (musical DNA rules, including things to include and things to avoid only if there are disliked songs).`;
 }
 
 /**
